@@ -134,10 +134,7 @@
                 <p class="text-xs text-gray-500">臺東縣立東海國民小學專用版 (A4 自動合併 2 張 A5 列印)</p>
             </div>
             <div class="flex items-center gap-3">
-                <button onclick="fetchFromGoogleSheet()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg shadow flex items-center gap-1.5 transition text-sm">
-                    🔄 載入雲端試算表
-                </button>
-                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg shadow flex items-center gap-1.5 transition text-sm">
+                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-lg shadow-md flex items-center gap-2 transition">
                     🖨️ 列印 / 另存為 PDF
                 </button>
             </div>
@@ -146,6 +143,26 @@
 
     <!-- 後台設定與匯入區塊 -->
     <div class="no-print max-w-7xl mx-auto p-4 space-y-5">
+        
+        <!-- 雲端試算表同步通知列 -->
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-2.5">
+                <span class="text-2xl">📊</span>
+                <div>
+                    <span class="text-xs font-bold text-blue-900">已綁定 Google 雲端試算表</span>
+                    <p class="text-[11px] text-blue-700">可隨時點擊右側按鈕直接從雲端試算表同步學生名冊。</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="fetchFromGoogleSheet()" id="btnSyncSheet" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow transition flex items-center gap-1.5">
+                    🔄 從雲端試算表載入名冊
+                </button>
+                <a href="https://docs.google.com/spreadsheets/d/12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw/edit?usp=sharing" target="_blank" class="text-xs text-blue-600 hover:underline px-2 py-1">
+                    開啟試算表 ↗
+                </a>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
             
             <!-- 1. 基本設定 -->
@@ -162,7 +179,7 @@
                         <label class="block text-gray-600 mb-1">文號前綴與起始號 (自動連號)</label>
                         <div class="flex gap-2">
                             <input type="text" id="docPrefix" value="(113)東海小在證字第" class="w-2/3 border rounded px-2.5 py-1.5">
-                            <input type="text" id="docStartNum" value="463-1" class="w-1/3 border rounded px-2 py-1.5 text-center font-mono">
+                            <input type="text" id="docStartNum" value="463-3" class="w-1/3 border rounded px-2 py-1.5 text-center font-mono">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
@@ -172,28 +189,25 @@
                         </div>
                         <div>
                             <label class="block text-gray-600 mb-1">發證日期</label>
-                            <input type="date" id="issueDateInput" class="w-full border rounded px-2 py-1.5">
+                            <input type="date" id="issueDateInput" class="w-full border rounded px-2.5 py-1.5">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. 照片匯入設定 -->
+            <!-- 2. 照片批次匯入 -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                 <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
-                    🖼️ 2. 學生照片載入與比對
+                    🖼️ 2. 學生照片比對與匯入
                 </h2>
-                <div class="space-y-2 text-xs">
-                    <p class="text-[11px] text-gray-500">
-                        🔗 雲端照片資料夾：<a href="https://drive.google.com/drive/folders/1AlwaUa9NHPqU4Lw7ysKAHTlU26VIN7pd" target="_blank" class="text-blue-600 underline">開啟 Google Drive</a>
-                    </p>
-                    <label class="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-lg p-2.5 flex flex-col items-center justify-center cursor-pointer bg-gray-50 transition">
-                        <span class="text-xl mb-1">📁</span>
-                        <span class="text-xs text-blue-600 font-medium">選取照片資料夾 / 多張照片比對</span>
-                        <input type="file" id="photoFilesInput" multiple accept="image/*" class="hidden" onchange="handlePhotoUpload(event)">
-                    </label>
-                    <div id="photoMatchStatus" class="text-[11px] text-gray-600 font-medium">目前快取相片：<span id="photoCount">0</span> 張</div>
-                </div>
+                <p class="text-[11px] text-gray-500 mb-2">從 <a href="https://drive.google.com/drive/folders/1AlwaUa9NHPqU4Lw7ysKAHTlU26VIN7pd?usp=drive_link" target="_blank" class="text-blue-600 underline font-medium">雲端照片夾</a> 下載照片後，選取或拖曳進來即可自動比對「<span class="text-red-500 font-bold">學生姓名.jpg</span>」：</p>
+                
+                <label class="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer bg-gray-50 transition">
+                    <span class="text-2xl mb-1">📁</span>
+                    <span class="text-xs text-blue-600 font-medium">選取多張照片檔案 / 資料夾</span>
+                    <input type="file" id="photoFilesInput" multiple accept="image/*" class="hidden" onchange="handlePhotoUpload(event)">
+                </label>
+                <div id="photoMatchStatus" class="mt-2 text-xs text-gray-600 font-medium">目前已載入 0 張照片</div>
             </div>
 
             <!-- 3. 印章與位置微調 -->
@@ -220,7 +234,7 @@
                             <input type="file" accept="image/*" class="text-[10px] w-28" onchange="loadCustomImage(event, 'principalSealImg')">
                         </div>
                         <div class="grid grid-cols-3 gap-1">
-                            <label>寬: <input type="number" id="sealPrinW" value="130" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
+                            <label>寬: <input type="number" id="sealPrinW" value="140" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
                             <label>X: <input type="number" id="sealPrinX" value="55" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
                             <label>Y: <input type="number" id="sealPrinY" value="73" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
                         </div>
@@ -231,36 +245,34 @@
 
         <!-- 4. 學生名冊匯入 -->
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-            <div class="flex flex-wrap justify-between items-center border-b pb-2 mb-3 gap-2">
+            <div class="flex justify-between items-center border-b pb-2 mb-3">
                 <div>
                     <h2 class="font-bold text-gray-700 text-sm flex items-center gap-1.5">
-                        📋 4. 學生名冊資料 (支援線上同步 / 試算表直接複製貼上)
+                        📋 4. 學生名冊管理
                     </h2>
-                    <p class="text-[11px] text-gray-500">
-                        雲端試算表：<a href="https://docs.google.com/spreadsheets/d/12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw/edit" target="_blank" class="text-emerald-700 underline font-semibold">點此查看 Google Sheet</a>
-                    </p>
+                    <p class="text-[11px] text-gray-500">支援雲端自動同步，亦可手動複製試算表整列文字貼於下方快速解析。</p>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="fetchFromGoogleSheet()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition flex items-center gap-1">
-                        🔄 雲端試算表自動同步
+                    <button onclick="parsePasteData()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1 rounded transition">
+                        📥 解析文字
                     </button>
-                    <button onclick="parsePasteData()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition">
-                        📥 解析手動貼上文字
+                    <button onclick="loadSampleData()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2.5 py-1 rounded transition">
+                        重置為王小明範例
                     </button>
                 </div>
             </div>
 
-            <textarea id="pasteArea" rows="2" placeholder="可直接從試算表複製整列貼上：姓名	身分證字號	生日(西元)	班級	座號" class="w-full border rounded p-2 text-xs font-mono focus:ring-2 focus:ring-blue-500 mb-2"></textarea>
+            <textarea id="pasteArea" rows="2" placeholder="貼上範例：&#10;王小明	V123456789	2013-07-08	六年一班	01" class="w-full border rounded p-2 text-xs font-mono focus:ring-2 focus:ring-blue-500 mb-2"></textarea>
 
             <!-- 學生清單預覽表 -->
-            <div class="overflow-x-auto max-h-56 overflow-y-auto">
+            <div class="overflow-x-auto max-h-48 overflow-y-auto">
                 <table class="w-full text-left text-xs border">
                     <thead class="bg-gray-100 border-b sticky top-0">
                         <tr>
                             <th class="p-1.5 w-10 text-center"><input type="checkbox" id="selectAll" checked onchange="toggleSelectAll(this)"></th>
                             <th class="p-1.5">姓名</th>
                             <th class="p-1.5">身分證字號</th>
-                            <th class="p-1.5">生日(西元/民國)</th>
+                            <th class="p-1.5">生日(西元)</th>
                             <th class="p-1.5">班級(轉換後)</th>
                             <th class="p-1.5">座號</th>
                             <th class="p-1.5">相片狀態</th>
@@ -282,108 +294,28 @@
     </div>
 
     <script>
-        // Google Drive 圖片直鏈轉換函式
-        function getDriveDirectLink(id) {
-            return `https://lh3.googleusercontent.com/d/${id}`;
-        }
+        // 雲端試算表 ID
+        const GOOGLE_SPREADSHEET_ID = '12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw';
 
-        // 雲端圖檔 ID 設定
-        const OFFICIAL_SEAL_ID = '1JCmzJ3aUoNgm9pwQaF-bUw6PMXzCDxXU';
-        const PRINCIPAL_SEAL_ID = '1_CMymGd3jyvqeZe7-qp2hZDkHlRsfq_R';
-        const SPREADSHEET_ID = '12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw';
-
-        let officialSealData = getDriveDirectLink(OFFICIAL_SEAL_ID);
-        let principalSealData = getDriveDirectLink(PRINCIPAL_SEAL_ID);
+        // 雲端官防與校長印直連網址 (使用 Google 直連 CDN 確保跨網域載入)
+        let officialSealData = 'https://lh3.googleusercontent.com/d/1JCmzJ3aUoNgm9pwQaF-bUw6PMXzCDxXU';
+        let principalSealData = 'https://lh3.googleusercontent.com/d/1_CMymGd3jyvqeZe7-qp2hZDkHlRsfq_R';
 
         let photoMap = {};
         let studentList = [];
 
         window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('issueDateInput').value = '2024-10-24';
-            // 頁面載入時嘗試自動同步雲端試算表
-            fetchFromGoogleSheet();
+            loadSampleData();
         });
 
-        // 🔄 從 Google 雲端試算表自動獲取資料 (透過公開 CSV 匯出端點)
-        async function fetchFromGoogleSheet() {
-            const statusEl = document.getElementById('photoMatchStatus');
-            try {
-                // 讀取發布或共用試算表的 CSV 端點
-                const csvUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
-                const response = await fetch(csvUrl);
-                
-                if (!response.ok) {
-                    throw new Error('無法直接讀取，將使用備援範例資料');
-                }
-
-                const csvText = await response.text();
-                parseCsvToStudents(csvText);
-            } catch (err) {
-                console.warn('雲端試算表連線提示:', err);
-                // 備用範例資料
-                if (studentList.length === 0) {
-                    loadSampleData();
-                }
-            }
-        }
-
-        // 解析 CSV 資料為學生清單
-        function parseCsvToStudents(csvText) {
-            const rows = csvText.split('\n').map(r => {
-                // 處理 CSV 雙引號
-                return r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.replace(/^"|"$/g, '').trim());
-            });
-
-            if (rows.length === 0) return;
-
-            studentList = [];
-            
-            // 判斷第 0 列是否為標題列
-            let startIndex = 0;
-            if (rows[0].some(col => col.includes('姓名') || col.includes('身分證') || col.includes('班級') || col.includes('核取'))) {
-                startIndex = 1;
-            }
-
-            for (let i = startIndex; i < rows.length; i++) {
-                const cols = rows[i];
-                if (!cols || cols.length < 2 || !cols.join('')) continue;
-
-                // 若第一欄是核取方塊 (TRUE/FALSE)，後移一格
-                let offset = 0;
-                if (cols[0].toUpperCase() === 'TRUE' || cols[0].toUpperCase() === 'FALSE' || cols[0] === '') {
-                    offset = 1;
-                }
-
-                const name = cols[offset] || "";
-                if (!name) continue;
-
-                const idCard = cols[offset + 1] || "";
-                const birthday = cols[offset + 2] || "";
-                const grade = cols[offset + 3] || "六年級";
-                const seatNo = cols[offset + 4] || "";
-                const photoUrl = cols[offset + 5] || ""; // 若試算表有照片直鏈
-
-                studentList.push({
-                    selected: true,
-                    name: name,
-                    idCard: idCard,
-                    birthday: birthday,
-                    grade: grade,
-                    seatNo: seatNo,
-                    photo: photoMap[name] || photoUrl || ""
-                });
-            }
-
-            renderStudentTable();
-            renderCertificates();
-        }
-
+        // 預設範例學生：王小明
         function loadSampleData() {
             studentList = [
                 {
                     selected: true,
-                    name: "蔡侑恩",
-                    idCard: "V221922735",
+                    name: "王小明",
+                    idCard: "V123456789",
                     birthday: "2013-07-08",
                     grade: "六年一班",
                     seatNo: "01",
@@ -394,7 +326,69 @@
             renderCertificates();
         }
 
-        // 解析手動貼上文字
+        // 從 Google 雲端試算表即時獲取資料
+        async function fetchFromGoogleSheet() {
+            const btn = document.getElementById('btnSyncSheet');
+            btn.innerText = '⏳ 讀取中...';
+            btn.disabled = true;
+
+            const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SPREADSHEET_ID}/gviz/tq?tqx=out:json`;
+
+            try {
+                const response = await fetch(url);
+                const text = await response.text();
+                
+                // 解析 Google Visualization JSON 回應
+                const jsonText = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+                const data = JSON.parse(jsonText);
+                const rows = data.table.rows;
+
+                if (!rows || rows.length === 0) {
+                    alert('試算表中未找到資料，請確認試算表內容！');
+                    return;
+                }
+
+                studentList = [];
+
+                rows.forEach((row) => {
+                    const c = row.c;
+                    if (!c) return;
+
+                    // 欄位順序容錯對應（自動過濾標題列與空白列）
+                    let name = c[1] ? String(c[1].v || '').trim() : (c[0] ? String(c[0].v || '').trim() : '');
+                    let idCard = c[2] ? String(c[2].v || '').trim() : (c[1] ? String(c[1].v || '').trim() : '');
+                    let birthday = c[3] ? String(c[3].f || c[3].v || '').trim() : '';
+                    let grade = c[4] ? String(c[4].v || '').trim() : '六年級';
+                    let seatNo = c[5] ? String(c[5].v || '').trim() : '';
+
+                    // 略過表頭文字
+                    if (name.includes('姓名') || name === '') return;
+
+                    studentList.push({
+                        selected: true,
+                        name: name,
+                        idCard: idCard,
+                        birthday: birthday,
+                        grade: grade,
+                        seatNo: seatNo,
+                        photo: photoMap[name] || ''
+                    });
+                });
+
+                renderStudentTable();
+                renderCertificates();
+                alert(`🎉 成功從雲端試算表載入 ${studentList.length} 位學生資料！`);
+
+            } catch (err) {
+                console.error(err);
+                alert('載入失敗！請確認該 Google 試算表共用設定已開啟為「知道連結的人均可檢視」。');
+            } finally {
+                btn.innerText = '🔄 從雲端試算表載入名冊';
+                btn.disabled = false;
+            }
+        }
+
+        // 解析貼上的文字
         function parsePasteData() {
             const raw = document.getElementById('pasteArea').value.trim();
             if (!raw) return;
@@ -404,20 +398,18 @@
 
             lines.forEach((line) => {
                 const cols = line.split(/[\t,]/).map(c => c.trim());
-                let offset = 0;
-                if (cols[0].toUpperCase() === 'TRUE' || cols[0].toUpperCase() === 'FALSE') {
-                    offset = 1;
-                }
-
-                if (cols.length >= 2 && cols[offset]) {
+                if (cols.length >= 2 && cols[0]) {
+                    // 若第1欄是打勾標記或核取方塊，自動後移一欄判斷
+                    let offset = (cols[0] === 'TRUE' || cols[0] === 'FALSE' || cols[0] === 'V' || cols[0] === 'v') ? 1 : 0;
+                    
                     studentList.push({
                         selected: true,
-                        name: cols[offset] || "",
-                        idCard: cols[offset + 1] || "",
-                        birthday: cols[offset + 2] || "",
-                        grade: cols[offset + 3] || "六年一班",
-                        seatNo: cols[offset + 4] || "",
-                        photo: photoMap[cols[offset]] || ""
+                        name: cols[0 + offset] || "",
+                        idCard: cols[1 + offset] || "",
+                        birthday: cols[2 + offset] || "",
+                        grade: cols[3 + offset] || "六年一班",
+                        seatNo: cols[4 + offset] || "",
+                        photo: photoMap[cols[0 + offset]] || ""
                     });
                 }
             });
@@ -438,20 +430,19 @@
             return str;
         }
 
-        // 西元生日轉民國格式
+        // 西元轉民國
         function toMinguoDate(dateStr) {
             if (!dateStr) return "中華民國102年07月08日";
-            const clean = dateStr.replace(/\//g, '-').replace(/\./g, '-');
+            const clean = dateStr.replace(/\//g, '-');
             const parts = clean.split('-');
             if (parts.length < 3) return dateStr;
-            let yr = parseInt(parts[0], 10);
-            if (yr > 1900) yr -= 1911; // 西元轉民國
+            const rocYear = parseInt(parts[0], 10) - 1911;
             const month = String(parts[1]).padStart(2, '0');
             const day = String(parts[2]).padStart(2, '0');
-            return `中華民國${yr}年${month}月${day}日`;
+            return `中華民國${rocYear}年${month}月${day}日`;
         }
 
-        // 發證日期字距處理
+        // 發證日期 (字元寬距)
         function getIssueDateMinguoSpaced() {
             const val = document.getElementById('issueDateInput').value;
             if (!val) return "中 華 民 國 1 1 3 年 1 0 月 2 4 日";
@@ -482,7 +473,7 @@
 
                     loadedCount++;
                     if (loadedCount === files.length) {
-                        document.getElementById('photoCount').innerText = Object.keys(photoMap).length;
+                        document.getElementById('photoMatchStatus').innerText = `已成功載入 ${loadedCount} 張照片！`;
                         renderStudentTable();
                         renderCertificates();
                     }
@@ -537,6 +528,7 @@
             renderCertificates();
         }
 
+        // 自動流水號產生
         function generateDocNo(index) {
             const prefix = document.getElementById('docPrefix').value;
             const startNum = document.getElementById('docStartNum').value.trim();
@@ -552,7 +544,7 @@
             }
         }
 
-        // 渲染證明書（嚴格維持圖層順序與精準尺寸）
+        // 渲染證明書（嚴格圖層順序：官防最底、校長中間、文字最上）
         function renderCertificates() {
             const container = document.getElementById('pagesOutput');
             container.innerHTML = '';
@@ -600,10 +592,10 @@
                         <!-- ==================== 圖層 1 & 2：印章層 (背景) ==================== -->
                         <div class="seals-overlay">
                             <!-- 最底層 (z-index: 10)：學校官防大印 -->
-                            <img src="${officialSealData}" class="seal-official-img" style="width: ${offW}mm; left: ${offX}%; top: ${offY}%;" onerror="this.src='https://drive.google.com/thumbnail?id=${OFFICIAL_SEAL_ID}&sz=w1000'" alt="官防">
+                            <img src="${officialSealData}" class="seal-official-img" style="width: ${offW}mm; left: ${offX}%; top: ${offY}%;" alt="官防">
 
                             <!-- 中間層 (z-index: 20)：校長簽名章 -->
-                            <img src="${principalSealData}" class="seal-principal-img" style="width: ${prinW}mm; left: ${prinX}%; top: ${prinY}%;" onerror="this.src='https://drive.google.com/thumbnail?id=${PRINCIPAL_SEAL_ID}&sz=w1000'" alt="校長簽名">
+                            <img src="${principalSealData}" class="seal-principal-img" style="width: ${prinW}mm; left: ${prinX}%; top: ${prinY}%;" alt="校長簽名">
                         </div>
 
                         <!-- ==================== 圖層 3：最上層所有文字與照片 (z-index: 30) ==================== -->
@@ -624,7 +616,7 @@
                             <div class="w-[30mm] h-[40mm] border border-gray-400 bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                                 ${st.photo ? 
                                     `<img src="${st.photo}" class="w-full h-full object-cover" alt="${st.name}">` : 
-                                    `<span class="text-gray-400 text-xs">學生照片</span>`
+                                    `<span class="text-gray-400 text-xs">${st.name}</span>`
                                 }
                             </div>
 
@@ -652,6 +644,7 @@
             }
         }
 
+        // 監聽基本設定即時刷新
         ['schoolName', 'docPrefix', 'docStartNum', 'termInput', 'issueDateInput'].forEach(id => {
             document.getElementById(id).addEventListener('input', renderCertificates);
         });
