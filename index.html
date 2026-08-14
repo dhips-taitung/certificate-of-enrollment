@@ -4,17 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>在學證明書批次產生系統 - 臺東縣立東海國民小學</title>
-    <!-- 引入 Tailwind CSS 美化後台介面 -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 標楷體字型設定 */
+        /* 標楷體字型定義 */
         @font-face {
             font-family: 'DFKai-SB';
             src: local('DFKai-SB'), local('BiauKai'), local('標楷體');
         }
 
         .font-kai {
-            font-family: 'DFKai-SB', 'BiauKai', '標楷體', 'TW-Kai', serif;
+            font-family: 'DFKai-SB', 'BiauKai', '標楷體', 'TW-Kai', 'Times New Roman', serif;
         }
 
         /* 螢幕預覽與列印版面設定 */
@@ -26,14 +26,14 @@
         @media screen {
             .preview-container {
                 background-color: #525659;
-                padding: 20px;
+                padding: 24px;
             }
             .a4-page {
                 width: 210mm;
                 min-height: 297mm;
                 background: white;
-                margin: 0 auto 20px auto;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                margin: 0 auto 24px auto;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.35);
                 box-sizing: border-box;
                 display: flex;
                 flex-direction: column;
@@ -67,62 +67,74 @@
             }
         }
 
-        /* 單張 A5 橫式證明書樣式 */
+        /* 單張 A5 橫式證明書外框容器 */
         .cert-card {
             width: 100%;
-            height: 138mm; /* A5 橫式高度適配 */
-            border: 2px solid #1a1a1a;
+            height: 139mm;
+            border: 2.5px solid #000;
             box-sizing: border-box;
             position: relative;
-            padding: 10mm 14mm 8mm 14mm;
+            padding: 9mm 12mm 6mm 12mm;
             background: #fff;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+            overflow: hidden;
         }
 
-        /* 印章疊加定位 */
-        .seal-container {
+        /* ---------------- 圖層順序設定 ---------------- */
+        
+        /* 1. 最上層 (z-index: 30)：所有文字與相片 */
+        .layer-text {
+            position: relative;
+            z-index: 30;
+            background: transparent;
+        }
+
+        /* 2. 印章圖層容器 */
+        .seals-overlay {
             position: absolute;
-            right: 48mm;
-            bottom: 12mm;
-            width: 58mm;
-            height: 58mm;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             pointer-events: none;
         }
 
-        .seal-official {
-            width: 100%;
-            height: 100%;
+        /* 官防印章（最底層 z-index: 10） */
+        .seal-official-img {
+            position: absolute;
+            z-index: 10;
             object-fit: contain;
             opacity: 0.85;
+            mix-blend-mode: multiply;
+            transform: translate(-50%, -50%);
         }
 
-        .seal-principal {
+        /* 校長簽名章（中間層 z-index: 20） */
+        .seal-principal-img {
             position: absolute;
-            top: 52%;
-            left: 20%;
-            transform: translateY(-50%);
-            width: 82mm;
+            z-index: 20;
             object-fit: contain;
             opacity: 0.95;
             mix-blend-mode: multiply;
+            transform: translate(-50%, -50%);
         }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800">
 
-    <!-- 頂部控制面板（列印時自動隱藏） -->
+    <!-- 頂部控制列 -->
     <div class="no-print bg-white border-b shadow-sm sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
             <div>
                 <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    🎓 在學證明書產生系統
+                    🎓 在學證明書批次產生系統
                 </h1>
-                <p class="text-xs text-gray-500">臺東縣立東海國民小學專用版 (A4 雙併 A5 自動列印)</p>
+                <p class="text-xs text-gray-500">臺東縣立東海國民小學專用版 (A4 自動合併 2 張 A5 列印)</p>
             </div>
             <div class="flex items-center gap-3">
-                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg shadow flex items-center gap-2 transition">
+                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-lg shadow-md flex items-center gap-2 transition">
                     🖨️ 列印 / 另存為 PDF
                 </button>
             </div>
@@ -130,145 +142,151 @@
     </div>
 
     <!-- 後台設定與匯入區塊 -->
-    <div class="no-print max-w-7xl mx-auto p-4 space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="no-print max-w-7xl mx-auto p-4 space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
             
             <!-- 1. 基本設定 -->
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                <h2 class="font-bold text-gray-700 border-b pb-2 mb-4 flex items-center gap-2">
-                    ⚙️ 後台證明書設定
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
+                    ⚙️ 1. 證明書基本資料
                 </h2>
-                <div class="space-y-3 text-sm">
+                <div class="space-y-2.5 text-xs">
                     <div>
                         <label class="block text-gray-600 mb-1">學校抬頭名稱</label>
-                        <input type="text" id="schoolName" value="臺東縣立東海國民小學在學證明書" class="w-full border rounded px-3 py-1.5 focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="schoolName" value="臺東縣立東海國民小學在學證明書" class="w-full border rounded px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <label class="block text-gray-600 mb-1">文號前綴與字號 (自動流水號)</label>
+                        <label class="block text-gray-600 mb-1">文號前綴與起始號 (自動連號)</label>
                         <div class="flex gap-2">
-                            <input type="text" id="docPrefix" value="(113)東海小在證字第" class="w-2/3 border rounded px-3 py-1.5">
-                            <input type="text" id="docStartNum" value="463-1" placeholder="起始號" class="w-1/3 border rounded px-2 py-1.5 text-center">
+                            <input type="text" id="docPrefix" value="(113)東海小在證字第" class="w-2/3 border rounded px-2.5 py-1.5">
+                            <input type="text" id="docStartNum" value="463-3" class="w-1/3 border rounded px-2 py-1.5 text-center font-mono">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-gray-600 mb-1">就讀學期</label>
-                            <input type="text" id="termInput" value="第1學期" class="w-full border rounded px-3 py-1.5">
+                            <input type="text" id="termInput" value="第1學期" class="w-full border rounded px-2.5 py-1.5">
                         </div>
                         <div>
                             <label class="block text-gray-600 mb-1">發證日期</label>
-                            <input type="date" id="issueDateInput" class="w-full border rounded px-3 py-1.5">
+                            <input type="date" id="issueDateInput" class="w-full border rounded px-2 py-1.5">
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- 2. 照片批次匯入 -->
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                <h2 class="font-bold text-gray-700 border-b pb-2 mb-4 flex items-center gap-2">
-                    🖼️ 照片批次比對
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
+                    🖼️ 2. 學生照片批次匯入
                 </h2>
-                <p class="text-xs text-gray-500 mb-3">請選取學生證件照（檔名需為「<span class="text-red-500 font-bold">學生姓名.jpg</span>」或「<span class="text-red-500 font-bold">姓名.png</span>」）：</p>
+                <p class="text-[11px] text-gray-500 mb-2">請選取學生大頭照（檔名需為「<span class="text-red-500 font-bold">學生姓名.jpg</span>」）：</p>
                 
-                <label class="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer bg-gray-50 transition">
-                    <span class="text-3xl mb-1">📁</span>
-                    <span class="text-xs text-blue-600 font-semibold">點此選取多張照片 / 照片資料夾</span>
+                <label class="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer bg-gray-50 transition">
+                    <span class="text-2xl mb-1">📁</span>
+                    <span class="text-xs text-blue-600 font-medium">選取多張照片檔案 / 照片資料夾</span>
                     <input type="file" id="photoFilesInput" multiple accept="image/*" class="hidden" onchange="handlePhotoUpload(event)">
                 </label>
-                <div id="photoMatchStatus" class="mt-2 text-xs text-gray-600 font-medium">已載入 0 張照片</div>
+                <div id="photoMatchStatus" class="mt-2 text-xs text-gray-600 font-medium">目前已載入 0 張照片</div>
             </div>
 
-            <!-- 3. 印章圖檔設定 -->
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-                <h2 class="font-bold text-gray-700 border-b pb-2 mb-4 flex items-center gap-2">
-                    🔴 印章與簽名檔
+            <!-- 3. 印章與位置微調 -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
+                    🔴 3. 印章圖檔與位置即時微調
                 </h2>
-                <div class="space-y-3 text-xs">
-                    <div>
-                        <label class="block text-gray-600 mb-1 font-medium">學校官防印章</label>
-                        <input type="file" accept="image/*" class="w-full text-xs" onchange="loadCustomImage(event, 'officialSealImg')">
+                <div class="space-y-2 text-[11px]">
+                    <div class="p-2 bg-gray-50 rounded border">
+                        <div class="flex justify-between font-bold text-gray-700 mb-1">
+                            <span>官防大印 (最底層)</span>
+                            <input type="file" accept="image/*" class="text-[10px] w-28" onchange="loadCustomImage(event, 'officialSealImg')">
+                        </div>
+                        <div class="grid grid-cols-3 gap-1">
+                            <label>寬: <input type="number" id="sealOffW" value="52" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
+                            <label>X: <input type="number" id="sealOffX" value="52" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                            <label>Y: <input type="number" id="sealOffY" value="68" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-gray-600 mb-1 font-medium">校長簽名印</label>
-                        <input type="file" accept="image/*" class="w-full text-xs" onchange="loadCustomImage(event, 'principalSealImg')">
+
+                    <div class="p-2 bg-gray-50 rounded border">
+                        <div class="flex justify-between font-bold text-gray-700 mb-1">
+                            <span>校長簽名章 (中間層)</span>
+                            <input type="file" accept="image/*" class="text-[10px] w-28" onchange="loadCustomImage(event, 'principalSealImg')">
+                        </div>
+                        <div class="grid grid-cols-3 gap-1">
+                            <label>寬: <input type="number" id="sealPrinW" value="74" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
+                            <label>X: <input type="number" id="sealPrinX" value="55" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                            <label>Y: <input type="number" id="sealPrinY" value="73" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 4. 學生資料快速貼上與編輯 -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <div class="flex justify-between items-center border-b pb-3 mb-4">
+        <!-- 4. 學生名冊匯入 -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex justify-between items-center border-b pb-2 mb-3">
                 <div>
-                    <h2 class="font-bold text-gray-700 flex items-center gap-2">
-                        📋 學生名冊資料匯入 (支援 Excel / 試算表直接複製貼上)
+                    <h2 class="font-bold text-gray-700 text-sm flex items-center gap-1.5">
+                        📋 4. 學生資料快速貼上 (Excel / Google 試算表直接複製整列貼上)
                     </h2>
-                    <p class="text-xs text-gray-500 mt-1">欄位順序：<b>學生姓名、身分證字號、生日(西元)、班級、座號</b>（直接於試算表複製整列後貼在下方）</p>
+                    <p class="text-[11px] text-gray-500">欄位順序：<b>學生姓名、身分證字號、生日(西元如 2013-07-08)、班級(如 六年一班)、座號</b></p>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="parsePasteData()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition">
-                        📥 解析文字並套用
+                    <button onclick="parsePasteData()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1 rounded transition">
+                        📥 解析文字
                     </button>
-                    <button onclick="loadSampleData()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-3 py-1.5 rounded transition">
-                        載入範例資料
+                    <button onclick="loadSampleData()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2.5 py-1 rounded transition">
+                        重置範例
                     </button>
                 </div>
             </div>
 
-            <textarea id="pasteArea" rows="3" placeholder="貼上範例：&#10;王小明	V123456789	2013-07-08	六年一班	01" class="w-full border rounded-lg p-2.5 text-xs font-mono focus:ring-2 focus:ring-blue-500 mb-3"></textarea>
+            <textarea id="pasteArea" rows="2" placeholder="貼上範例：&#10;王小明	V123456789	2013-07-08	六年一班	01" class="w-full border rounded p-2 text-xs font-mono focus:ring-2 focus:ring-blue-500 mb-2"></textarea>
 
             <!-- 學生清單預覽表 -->
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto max-h-48 overflow-y-auto">
                 <table class="w-full text-left text-xs border">
-                    <thead class="bg-gray-100 border-b">
+                    <thead class="bg-gray-100 border-b sticky top-0">
                         <tr>
-                            <th class="p-2 w-12 text-center"><input type="checkbox" id="selectAll" checked onchange="toggleSelectAll(this)"></th>
-                            <th class="p-2">姓名</th>
-                            <th class="p-2">身分證字號</th>
-                            <th class="p-2">生日(西元)</th>
-                            <th class="p-2">班級 (自動轉年級)</th>
-                            <th class="p-2">座號</th>
-                            <th class="p-2">照片狀態</th>
-                            <th class="p-2 text-center">操作</th>
+                            <th class="p-1.5 w-10 text-center"><input type="checkbox" id="selectAll" checked onchange="toggleSelectAll(this)"></th>
+                            <th class="p-1.5">姓名</th>
+                            <th class="p-1.5">身分證字號</th>
+                            <th class="p-1.5">生日(西元)</th>
+                            <th class="p-1.5">班級(轉換後)</th>
+                            <th class="p-1.5">座號</th>
+                            <th class="p-1.5">相片狀態</th>
+                            <th class="p-1.5 text-center">操作</th>
                         </tr>
                     </thead>
                     <tbody id="studentTableBody" class="divide-y divide-gray-200">
-                        <!-- 動態產生 -->
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- 列印與即時預覽區域 -->
+    <!-- 預覽與列印區域 -->
     <div class="preview-container">
         <div id="pagesOutput">
-            <!-- 動態生成 A4 頁面與 A5 證書 -->
+            <!-- 動態生成 A4 雙併頁面 -->
         </div>
     </div>
 
     <script>
-        // 預設印章圖（您提供的圖檔）
+        // 預設印章圖檔
         let officialSealData = 'https://drive.google.com/thumbnail?id=1JCmzJ3aUoNgm9pwQaF-bUw6PMXzCDxXU&sz=w1000';
         let principalSealData = 'https://drive.google.com/thumbnail?id=1_CMymGd3jyvqeZe7-qp2hZDkHlRsfq_R&sz=w1000';
 
-        // 照片庫快取：{ "姓名": "base64/URL" }
         let photoMap = {};
-
-        // 學生資料陣列
         let studentList = [];
 
-        // 初始化日期為當天
         window.addEventListener('DOMContentLoaded', () => {
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
-            document.getElementById('issueDateInput').value = `${yyyy}-${mm}-${dd}`;
+            // 預設填入截圖中的發證日期（或當日）
+            document.getElementById('issueDateInput').value = '2024-10-24';
             loadSampleData();
         });
 
-        // 載入範例資料
         function loadSampleData() {
             studentList = [
                 {
@@ -285,7 +303,7 @@
             renderCertificates();
         }
 
-        // 解析貼上的試算表文字
+        // 解析貼上的文字
         function parsePasteData() {
             const raw = document.getElementById('pasteArea').value.trim();
             if (!raw) return;
@@ -293,7 +311,7 @@
             const lines = raw.split('\n');
             studentList = [];
 
-            lines.forEach((line, idx) => {
+            lines.forEach((line) => {
                 const cols = line.split(/[\t,]/).map(c => c.trim());
                 if (cols.length >= 2 && cols[0]) {
                     studentList.push({
@@ -301,7 +319,7 @@
                         name: cols[0] || "",
                         idCard: cols[1] || "",
                         birthday: cols[2] || "",
-                        grade: cols[3] || "六年級",
+                        grade: cols[3] || "六年一班",
                         seatNo: cols[4] || "",
                         photo: photoMap[cols[0]] || ""
                     });
@@ -312,7 +330,7 @@
             renderCertificates();
         }
 
-        // 班級轉換為純年級（例如：六年一班 -> 六年級、6年2班 -> 六年級）
+        // 班級轉純年級
         function formatGrade(str) {
             if (!str) return "六年級";
             if (str.includes("一") || str.startsWith("1")) return "一年級";
@@ -324,9 +342,9 @@
             return str;
         }
 
-        // 西元生日轉民國年月日文字
+        // 西元轉民國
         function toMinguoDate(dateStr) {
-            if (!dateStr) return "中華民國 年 月 日";
+            if (!dateStr) return "中華民國102年07月08日";
             const clean = dateStr.replace(/\//g, '-');
             const parts = clean.split('-');
             if (parts.length < 3) return dateStr;
@@ -336,18 +354,18 @@
             return `中華民國${rocYear}年${month}月${day}日`;
         }
 
-        // 發證日期的民國字樣
+        // 發證日期 (字元寬距)
         function getIssueDateMinguoSpaced() {
             const val = document.getElementById('issueDateInput').value;
-            if (!val) return "中 華 民 國 年 月 日";
+            if (!val) return "中 華 民 國 1 1 3 年 1 0 月 2 4 日";
             const parts = val.split('-');
-            const rocYear = parseInt(parts[0], 10) - 1911;
-            const month = String(parts[1]).padStart(2, '0');
-            const day = String(parts[2]).padStart(2, '0');
-            return `中 華 民 國 ${rocYear} 年 ${month} 月 ${day} 日`;
+            const rocYear = String(parseInt(parts[0], 10) - 1911).split('').join(' ');
+            const month = String(parts[1]).padStart(2, '0').split('').join(' ');
+            const day = String(parts[2]).padStart(2, '0').split('').join(' ');
+            return `中 華 民 國  ${rocYear}  年  ${month}  月  ${day}  日`;
         }
 
-        // 批次上傳照片處理
+        // 照片批次載入
         function handlePhotoUpload(e) {
             const files = e.target.files;
             if (!files.length) return;
@@ -359,7 +377,6 @@
                 reader.onload = (event) => {
                     photoMap[nameWithoutExt] = event.target.result;
                     
-                    // 同步更新現有清單中的學生相片
                     studentList.forEach(st => {
                         if (st.name === nameWithoutExt) {
                             st.photo = event.target.result;
@@ -368,7 +385,7 @@
 
                     loadedCount++;
                     if (loadedCount === files.length) {
-                        document.getElementById('photoMatchStatus').innerText = `已成功載入 ${loadedCount} 張照片並完成比對！`;
+                        document.getElementById('photoMatchStatus').innerText = `已成功載入 ${loadedCount} 張照片！`;
                         renderStudentTable();
                         renderCertificates();
                     }
@@ -377,7 +394,7 @@
             });
         }
 
-        // 自訂印章上傳
+        // 上傳自訂印章
         function loadCustomImage(e, type) {
             const file = e.target.files[0];
             if (!file) return;
@@ -390,7 +407,6 @@
             reader.readAsDataURL(file);
         }
 
-        // 渲染後台學生清單
         function renderStudentTable() {
             const tbody = document.getElementById('studentTableBody');
             tbody.innerHTML = '';
@@ -399,18 +415,18 @@
                 const tr = document.createElement('tr');
                 const hasPhoto = !!st.photo;
                 tr.innerHTML = `
-                    <td class="p-2 text-center"><input type="checkbox" ${st.selected ? 'checked' : ''} onchange="studentList[${idx}].selected = this.checked; renderCertificates();"></td>
-                    <td class="p-2 font-bold">${st.name}</td>
-                    <td class="p-2 font-mono">${st.idCard}</td>
-                    <td class="p-2 font-mono">${st.birthday}</td>
-                    <td class="p-2">${st.grade} (${formatGrade(st.grade)})</td>
-                    <td class="p-2">${st.seatNo}</td>
-                    <td class="p-2">
-                        <span class="inline-block px-2 py-0.5 rounded text-[10px] ${hasPhoto ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+                    <td class="p-1.5 text-center"><input type="checkbox" ${st.selected ? 'checked' : ''} onchange="studentList[${idx}].selected = this.checked; renderCertificates();"></td>
+                    <td class="p-1.5 font-bold">${st.name}</td>
+                    <td class="p-1.5 font-mono">${st.idCard}</td>
+                    <td class="p-1.5 font-mono">${st.birthday}</td>
+                    <td class="p-1.5">${formatGrade(st.grade)}</td>
+                    <td class="p-1.5">${st.seatNo}</td>
+                    <td class="p-1.5">
+                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] ${hasPhoto ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}">
                             ${hasPhoto ? '已配對' : '無照片'}
                         </span>
                     </td>
-                    <td class="p-2 text-center">
+                    <td class="p-1.5 text-center">
                         <button onclick="studentList.splice(${idx}, 1); renderStudentTable(); renderCertificates();" class="text-red-500 hover:underline text-xs">刪除</button>
                     </td>
                 `;
@@ -424,12 +440,11 @@
             renderCertificates();
         }
 
-        // 產生文號（流水號格式支援：第463-1號, 463-2號 等）
+        // 自動流水號產生
         function generateDocNo(index) {
             const prefix = document.getElementById('docPrefix').value;
             const startNum = document.getElementById('docStartNum').value.trim();
             
-            // 嘗試解析 463-3 格式
             if (startNum.includes('-')) {
                 const parts = startNum.split('-');
                 const base = parts[0];
@@ -441,14 +456,14 @@
             }
         }
 
-        // 渲染證明書（2位學生一頁 A4）
+        // 渲染證明書（確保圖層順序：官防最底、校長中間、文字最上）
         function renderCertificates() {
             const container = document.getElementById('pagesOutput');
             container.innerHTML = '';
 
             const selectedStudents = studentList.filter(s => s.selected);
             if (selectedStudents.length === 0) {
-                container.innerHTML = '<div class="text-white text-center py-20 text-lg">目前沒有勾選任何學生資料。</div>';
+                container.innerHTML = '<div class="text-white text-center py-20 text-base">請至少勾選一位學生以產生證明書。</div>';
                 return;
             }
 
@@ -456,7 +471,16 @@
             const termText = document.getElementById('termInput').value;
             const dateSpaced = getIssueDateMinguoSpaced();
 
-            // 每2人為一頁 A4
+            // 取得使用者微調的印章尺寸與位置
+            const offW = document.getElementById('sealOffW').value;
+            const offX = document.getElementById('sealOffX').value;
+            const offY = document.getElementById('sealOffY').value;
+
+            const prinW = document.getElementById('sealPrinW').value;
+            const prinX = document.getElementById('sealPrinX').value;
+            const prinY = document.getElementById('sealPrinY').value;
+
+            // 每 2 人合併一張 A4
             for (let i = 0; i < selectedStudents.length; i += 2) {
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'a4-page';
@@ -465,7 +489,6 @@
 
                 pair.forEach((st, pairIdx) => {
                     if (!st) {
-                        // 奇數時放一個透明空卡片維持排版
                         const emptyCard = document.createElement('div');
                         emptyCard.className = 'cert-card opacity-0';
                         pageDiv.appendChild(emptyCard);
@@ -480,45 +503,50 @@
                     card.className = 'cert-card font-kai';
 
                     card.innerHTML = `
-                        <!-- 學校抬頭 -->
-                        <div class="text-center">
-                            <h1 class="text-[26px] font-bold tracking-[4px] text-black">${schoolTitle}</h1>
+                        <!-- ==================== 圖層 1 & 2：印章層 (背景) ==================== -->
+                        <div class="seals-overlay">
+                            <!-- 最底層 (z-index: 10)：學校官防大印 -->
+                            <img src="${officialSealData}" class="seal-official-img" style="width: ${offW}mm; left: ${offX}%; top: ${offY}%;" alt="官防">
+
+                            <!-- 中間層 (z-index: 20)：校長簽名章 -->
+                            <img src="${principalSealData}" class="seal-principal-img" style="width: ${prinW}mm; left: ${prinX}%; top: ${prinY}%;" alt="校長簽名">
                         </div>
 
-                        <!-- 文號 -->
-                        <div class="text-right text-[15px] tracking-wider text-black pr-2">
+                        <!-- ==================== 圖層 3：最上層所有文字與照片 (z-index: 30) ==================== -->
+                        
+                        <!-- 1. 學校抬頭 -->
+                        <div class="layer-text text-center pt-2">
+                            <h1 class="text-[26px] font-bold tracking-[3px] text-black">${schoolTitle}</h1>
+                        </div>
+
+                        <!-- 2. 文號 -->
+                        <div class="layer-text text-right text-[15px] tracking-wide text-black pr-1 font-medium">
                             ${docNo}
                         </div>
 
-                        <!-- 核心內容區 (左照片 + 右正文) -->
-                        <div class="flex items-start gap-8 my-auto px-4">
-                            <!-- 照片區 -->
-                            <div class="w-[32mm] h-[42mm] border border-gray-400 bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden">
+                        <!-- 3. 本文區 (左照片 + 右正文) -->
+                        <div class="layer-text flex items-start gap-6 px-3 my-auto">
+                            <!-- 照片框 -->
+                            <div class="w-[30mm] h-[40mm] border border-gray-400 bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                                 ${st.photo ? 
                                     `<img src="${st.photo}" class="w-full h-full object-cover" alt="${st.name}">` : 
                                     `<span class="text-gray-400 text-xs">學生照片</span>`
                                 }
                             </div>
 
-                            <!-- 正文文字 -->
-                            <div class="text-[17.5px] leading-[2.2] tracking-wide text-black text-justify flex-1">
-                                查學生 <span class="font-bold text-[19px] px-1">${st.name}</span> (${st.idCard}) ， ${bdayMinguo}生， 現在本校${gradeName} ${termText}就讀屬實，特發給在學證明書以資證明。
+                            <!-- 正文文字 (字距與行距比照範本) -->
+                            <div class="text-[17.5px] leading-[2.2] tracking-wide text-black text-justify flex-1 pt-1">
+                                查學生 <span class="text-[19px] font-bold px-1">${st.name}</span>(${st.idCard}) ， ${bdayMinguo}生， 現在本校${gradeName} ${termText}就讀屬實，特發給在學證明書以資證明。
                             </div>
                         </div>
 
-                        <!-- 此證 -->
-                        <div class="text-[17px] font-bold pl-16 mb-6">
+                        <!-- 4. 此證 -->
+                        <div class="layer-text text-[17.5px] font-bold pl-16 mb-4">
                             此證
                         </div>
 
-                        <!-- 官防與校長簽名蓋印 (絕對定位) -->
-                        <div class="seal-container">
-                            <img src="${officialSealData}" class="seal-official" alt="官防">
-                            <img src="${principalSealData}" class="seal-principal" alt="校長簽名">
-                        </div>
-
-                        <!-- 發證日期 -->
-                        <div class="text-center text-[18px] tracking-[6px] text-black font-semibold mt-2">
+                        <!-- 5. 發證日期 -->
+                        <div class="layer-text text-center text-[17px] text-black font-semibold tracking-wider pb-1">
                             ${dateSpaced}
                         </div>
                     `;
@@ -530,7 +558,7 @@
             }
         }
 
-        // 監聽後台設定變更
+        // 監聽基本設定即時刷新
         ['schoolName', 'docPrefix', 'docStartNum', 'termInput', 'issueDateInput'].forEach(id => {
             document.getElementById(id).addEventListener('input', renderCertificates);
         });
