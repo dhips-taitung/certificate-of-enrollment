@@ -204,7 +204,7 @@
                         <div class="grid grid-cols-3 gap-1">
                             <label>寬: <input type="number" id="sealOffW" value="52" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
                             <label>X: <input type="number" id="sealOffX" value="52" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
-                            <label>Y: <input type="number" id="sealOffY" value="68" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                            <label>Y: <input type="number" id="sealOffY" value="75" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
                         </div>
                     </div>
 
@@ -214,7 +214,7 @@
                             <input type="file" accept="image/*" class="text-[10px] w-28" onchange="loadCustomImage(event, 'principalSealImg')">
                         </div>
                         <div class="grid grid-cols-3 gap-1">
-                            <label>寬: <input type="number" id="sealPrinW" value="74" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
+                            <label>寬: <input type="number" id="sealPrinW" value="140" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
                             <label>X: <input type="number" id="sealPrinX" value="55" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
                             <label>Y: <input type="number" id="sealPrinY" value="73" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
                         </div>
@@ -333,12 +333,12 @@
         // 班級轉純年級
         function formatGrade(str) {
             if (!str) return "六年級";
-            if (str.includes("一") || str.startsWith("1")) return "一年級";
-            if (str.includes("二") || str.startsWith("2")) return "二年級";
-            if (str.includes("三") || str.startsWith("3")) return "三年級";
-            if (str.includes("四") || str.startsWith("4")) return "四年級";
-            if (str.includes("五") || str.startsWith("5")) return "五年級";
-            if (str.includes("六") || str.startsWith("6")) return "六年級";
+            if (str.includes("一年") || str.startsWith("1")) return "一年級";
+            if (str.includes("二年") || str.startsWith("2")) return "二年級";
+            if (str.includes("三年") || str.startsWith("3")) return "三年級";
+            if (str.includes("四年") || str.startsWith("4")) return "四年級";
+            if (str.includes("五年") || str.startsWith("5")) return "五年級";
+            if (str.includes("六年") || str.startsWith("6")) return "六年級";
             return str;
         }
 
