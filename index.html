@@ -152,11 +152,11 @@
             <div class="flex items-center gap-2">
                 <span class="font-bold text-emerald-900 text-sm">⚡ Google 雲端連線狀態：</span>
                 <span id="syncStatus" class="bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-1 rounded border border-emerald-300">
-                    🟢 已連線至雲端 API
+                    🟢 已就緒
                 </span>
             </div>
-            <div class="text-gray-500 text-[11px]">
-                點擊「同步全體名冊與照片」將自動取得最新試算表名冊、雲端照片與公文大印
+            <div id="syncDetailMsg" class="text-gray-500 text-[11px]">
+                點擊「同步全體名冊與照片」將自動取得試算表最新名冊、雲端照片與公文大印
             </div>
         </div>
 
@@ -192,7 +192,7 @@
                 </div>
             </div>
 
-            <!-- 2. 照片狀態與手動備用 -->
+            <!-- 2. 照片狀態與本地備用 -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                 <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
                     🖼️ 2. 照片同步狀態 / 本地備用
@@ -204,7 +204,7 @@
                     <span class="text-xs text-blue-600 font-medium">手動選取照片資料夾備用</span>
                     <input type="file" id="photoFilesInput" multiple accept="image/*" class="hidden" onchange="handlePhotoUpload(event)">
                 </label>
-                <div id="photoMatchStatus" class="mt-2 text-xs text-emerald-700 font-semibold">雲端照片：連線中...</div>
+                <div id="photoMatchStatus" class="mt-2 text-xs text-emerald-700 font-semibold">雲端照片：待同步</div>
             </div>
 
             <!-- 3. 印章與位置微調 -->
@@ -296,17 +296,13 @@
         let studentList = [];
 
         window.addEventListener('DOMContentLoaded', () => {
-            // 預設發證日期
             document.getElementById('issueDateInput').value = '2024-10-24';
-            
-            // 載入預設範例（王小明）
             loadSampleData();
 
-            // 網頁開啟時自動觸發一次同步
+            // 網頁開啟自動觸發同步
             syncAllFromGAS();
         });
 
-        // 預設王小明範例資料
         function loadSampleData() {
             studentList = [
                 {
@@ -323,45 +319,81 @@
             renderCertificates();
         }
 
-        // ================= 一鍵同步 GAS 全體資料 (直接讀取，無須貼網址) =================
+        // ================= JSONP 跨網域穿透請求函式 =================
+        function fetchJSONP(url) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'gas_callback_' + Math.round(100000 * Math.random());
+                const script = document.createElement('script');
+                
+                // 設定 25 秒逾時保護
+                const timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('雲端連線逾時，請確認 Google Drive 權限與網路狀況'));
+                }, 25000);
+
+                function cleanup() {
+                    if (window[callbackName]) delete window[callbackName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    clearTimeout(timeoutId);
+                }
+
+                window[callbackName] = function(data) {
+                    cleanup();
+                    resolve(data);
+                };
+
+                script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + callbackName;
+                script.onerror = function() {
+                    cleanup();
+                    reject(new Error('無法載入 GAS 腳本，請確認 GAS 是否已設為所有人 (Anyone) 可存取'));
+                };
+
+                document.body.appendChild(script);
+            });
+        }
+
+        // ================= 一鍵同步 GAS 全體資料 =================
         async function syncAllFromGAS() {
             const statusEl = document.getElementById('syncStatus');
+            const detailMsgEl = document.getElementById('syncDetailMsg');
             const syncBtn = document.getElementById('syncBtn');
+
             syncBtn.disabled = true;
             syncBtn.classList.add('opacity-50');
-            statusEl.innerText = "⏳ 正在同步雲端名冊、照片與印章 Base64...";
+            statusEl.innerText = "⏳ 正在同步雲端名冊、照片與印章...";
             statusEl.className = "bg-yellow-100 text-yellow-800 font-semibold px-2.5 py-1 rounded border border-yellow-300";
 
             try {
-                const response = await fetch(GAS_API_URL);
-                if (!response.ok) throw new Error("網路連線失敗 (HTTP " + response.status + ")");
-                
-                const data = await response.json();
+                // 使用 JSONP 穿透式讀取
+                const data = await fetchJSONP(GAS_API_URL);
+
                 if (data.status !== 'success') {
-                    throw new Error(data.message || "GAS 執行失敗");
+                    throw new Error(data.message || "GAS 後端回報執行錯誤");
                 }
 
-                // 1. 套用 Base64 印章
+                // 1. 載入 Base64 印章
                 if (data.officialSeal) officialSealData = data.officialSeal;
                 if (data.principalSeal) principalSealData = data.principalSeal;
 
-                // 2. 套用學生名冊與 Base64 相片
+                // 2. 載入學生名冊與 Base64 相片
                 if (Array.isArray(data.students) && data.students.length > 0) {
                     studentList = data.students;
                     let photoCount = studentList.filter(s => !!s.photo).length;
                     document.getElementById('photoMatchStatus').innerText = `✅ 已載入 ${studentList.length} 位學生（${photoCount} 張照片就緒）`;
                 }
 
-                statusEl.innerText = `🟢 同步完成！共 ${studentList.length} 位學生 (${new Date().toLocaleTimeString()})`;
+                statusEl.innerText = `🟢 同步完成！共 ${studentList.length} 位學生`;
                 statusEl.className = "bg-emerald-100 text-emerald-700 font-semibold px-2.5 py-1 rounded border border-emerald-300";
+                detailMsgEl.innerText = `最後更新時間：${new Date().toLocaleTimeString()} (照片與印章均已完成 Base64 內嵌)`;
 
                 renderStudentTable();
                 renderCertificates();
 
             } catch (err) {
-                console.error(err);
-                statusEl.innerText = "⚠️ 雲端讀取失敗，請點擊「同步」重試";
+                console.error("GAS Sync Error:", err);
+                statusEl.innerText = "⚠️ 雲端讀取失敗";
                 statusEl.className = "bg-red-100 text-red-700 font-semibold px-2.5 py-1 rounded border border-red-300";
+                detailMsgEl.innerText = `錯誤原因：${err.message}`;
             } finally {
                 syncBtn.disabled = false;
                 syncBtn.classList.remove('opacity-50');
@@ -403,7 +435,7 @@
             return `中 華 民 國  ${rocYear}  年  ${month}  月  ${day}  日`;
         }
 
-        // 本地照片備用上傳
+        // 本地照片備用手動上傳
         function handlePhotoUpload(e) {
             const files = e.target.files;
             if (!files.length) return;
