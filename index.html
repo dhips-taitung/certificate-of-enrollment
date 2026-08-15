@@ -131,13 +131,13 @@
                 <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
                     🎓 在學證明書批次產生系統
                 </h1>
-                <p class="text-xs text-gray-500">臺東縣立東海國民小學專用版 (GAS 雲端自動直連 · A4 雙併 A5)</p>
+                <p class="text-xs text-gray-500">臺東縣立東海國民小學專用版 (A4 自動合併 2 張 A5 列印)</p>
             </div>
             <div class="flex items-center gap-3">
-                <button onclick="syncAllFromGAS()" id="syncBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition text-sm">
-                    🔄 同步全體名冊與照片
+                <button onclick="fetchSheetDirectly()" id="syncBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition text-sm">
+                    🔄 同步雲端試算表名冊
                 </button>
-                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition text-sm">
+                <button onclick="printCertificates()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition text-sm">
                     🖨️ 列印 / 另存為 PDF
                 </button>
             </div>
@@ -147,16 +147,16 @@
     <!-- 後台設定與匯入區塊 -->
     <div class="no-print max-w-7xl mx-auto p-4 space-y-4">
         
-        <!-- 雲端同步狀態提示 -->
+        <!-- 狀態列 -->
         <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-xs flex flex-wrap justify-between items-center gap-2">
             <div class="flex items-center gap-2">
-                <span class="font-bold text-emerald-900 text-sm">⚡ Google 雲端連線狀態：</span>
+                <span class="font-bold text-emerald-900 text-sm">⚡ 試算表連線狀態：</span>
                 <span id="syncStatus" class="bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-1 rounded border border-emerald-300">
-                    🟢 已就緒
+                    🟢 已連線
                 </span>
             </div>
-            <div id="syncDetailMsg" class="text-gray-500 text-[11px]">
-                點擊「同步全體名冊與照片」將自動取得試算表最新名冊、雲端照片與公文大印
+            <div id="syncDetailMsg" class="text-gray-600 text-[11px]">
+                直連試算表：<a href="https://docs.google.com/spreadsheets/d/12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw/edit" target="_blank" class="text-blue-600 underline">已連結名冊</a> (官防與校長印章已預載完畢)
             </div>
         </div>
 
@@ -192,19 +192,19 @@
                 </div>
             </div>
 
-            <!-- 2. 照片狀態與本地備用 -->
+            <!-- 2. 照片批次載入 (支援資料夾一鍵載入) -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                 <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
-                    🖼️ 2. 照片同步狀態 / 本地備用
+                    🖼️ 2. 學生照片批次配對
                 </h2>
-                <p class="text-[11px] text-gray-500 mb-2">雲端照片將隨同步自動載入，亦可手動上傳本地照片：</p>
+                <p class="text-[11px] text-gray-500 mb-2">請選取雲端下載的學生照片（自動依姓名匹配）：</p>
                 
-                <label class="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer bg-gray-50 transition">
+                <label class="border-2 border-dashed border-emerald-400 hover:border-emerald-600 rounded-lg p-3 flex flex-col items-center justify-center cursor-pointer bg-emerald-50/50 transition">
                     <span class="text-2xl mb-1">📁</span>
-                    <span class="text-xs text-blue-600 font-medium">手動選取照片資料夾備用</span>
+                    <span class="text-xs text-emerald-700 font-bold">點此選取照片檔案 / 照片資料夾</span>
                     <input type="file" id="photoFilesInput" multiple accept="image/*" class="hidden" onchange="handlePhotoUpload(event)">
                 </label>
-                <div id="photoMatchStatus" class="mt-2 text-xs text-emerald-700 font-semibold">雲端照片：待同步</div>
+                <div id="photoMatchStatus" class="mt-2 text-xs text-gray-600 font-medium">照片狀態：可選取照片自動配對</div>
             </div>
 
             <!-- 3. 印章與位置微調 -->
@@ -247,7 +247,7 @@
                     <h2 class="font-bold text-gray-700 text-sm flex items-center gap-1.5">
                         📋 4. 學生名冊清單
                     </h2>
-                    <p class="text-[11px] text-gray-500">已自動自雲端取得名冊與照片，可勾選需列印的學生</p>
+                    <p class="text-[11px] text-gray-500">已自動自雲端取得名冊，可勾選需列印的學生</p>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="loadSampleData()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2.5 py-1 rounded transition">
@@ -286,23 +286,24 @@
     </div>
 
     <script>
-        // 固定內建的 Google Apps Script (GAS) 部署網址
-        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxQMh3x2f8cVb8ACFOhw_fiwRapZw0GybRdQDQJllhiSwD8__qVoNxVb6NashjcJxlClw/exec';
-
-        // 預設印章圖檔
+        // 試算表 ID 與 印章雲端直連網址
+        const SPREADSHEET_ID = '12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw';
+        
         let officialSealData = 'https://lh3.googleusercontent.com/d/1JCmzJ3aUoNgm9pwQaF-bUw6PMXzCDxXU';
         let principalSealData = 'https://lh3.googleusercontent.com/d/1_CMymGd3jyvqeZe7-qp2hZDkHlRsfq_R';
 
+        let photoMap = {};
         let studentList = [];
 
         window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('issueDateInput').value = '2024-10-24';
             loadSampleData();
 
-            // 網頁開啟自動觸發同步
-            syncAllFromGAS();
+            // 自動從試算表直接載入資料
+            fetchSheetDirectly();
         });
 
+        // 預設王小明範例資料
         function loadSampleData() {
             studentList = [
                 {
@@ -319,85 +320,96 @@
             renderCertificates();
         }
 
-        // ================= JSONP 跨網域穿透請求函式 =================
-        function fetchJSONP(url) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'gas_callback_' + Math.round(100000 * Math.random());
-                const script = document.createElement('script');
-                
-                // 設定 25 秒逾時保護
-                const timeoutId = setTimeout(() => {
-                    cleanup();
-                    reject(new Error('雲端連線逾時，請確認 Google Drive 權限與網路狀況'));
-                }, 25000);
-
-                function cleanup() {
-                    if (window[callbackName]) delete window[callbackName];
-                    if (script.parentNode) script.parentNode.removeChild(script);
-                    clearTimeout(timeoutId);
-                }
-
-                window[callbackName] = function(data) {
-                    cleanup();
-                    resolve(data);
-                };
-
-                script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + callbackName;
-                script.onerror = function() {
-                    cleanup();
-                    reject(new Error('無法載入 GAS 腳本，請確認 GAS 是否已設為所有人 (Anyone) 可存取'));
-                };
-
-                document.body.appendChild(script);
-            });
-        }
-
-        // ================= 一鍵同步 GAS 全體資料 =================
-        async function syncAllFromGAS() {
+        // ================= 免 GAS！直接讀取 Google 試算表公開名冊 =================
+        async function fetchSheetDirectly() {
             const statusEl = document.getElementById('syncStatus');
-            const detailMsgEl = document.getElementById('syncDetailMsg');
             const syncBtn = document.getElementById('syncBtn');
 
             syncBtn.disabled = true;
             syncBtn.classList.add('opacity-50');
-            statusEl.innerText = "⏳ 正在同步雲端名冊、照片與印章...";
+            statusEl.innerText = "⏳ 正在直接讀取 Google 試算表名冊...";
             statusEl.className = "bg-yellow-100 text-yellow-800 font-semibold px-2.5 py-1 rounded border border-yellow-300";
 
+            const csvUrl = `https://docs.google.com/spreadsheets/d/e/2PACX-1vTpYmGI89bpv_CvP7mbQbyimKqLLIqwKhMJte4ueGbykIsciLVKtiCaT7sCoCGSs5bBW0k75suo0UMq/pub?gid=1541163827&single=true&output=csv`;
+
             try {
-                // 使用 JSONP 穿透式讀取
-                const data = await fetchJSONP(GAS_API_URL);
-
-                if (data.status !== 'success') {
-                    throw new Error(data.message || "GAS 後端回報執行錯誤");
-                }
-
-                // 1. 載入 Base64 印章
-                if (data.officialSeal) officialSealData = data.officialSeal;
-                if (data.principalSeal) principalSealData = data.principalSeal;
-
-                // 2. 載入學生名冊與 Base64 相片
-                if (Array.isArray(data.students) && data.students.length > 0) {
-                    studentList = data.students;
-                    let photoCount = studentList.filter(s => !!s.photo).length;
-                    document.getElementById('photoMatchStatus').innerText = `✅ 已載入 ${studentList.length} 位學生（${photoCount} 張照片就緒）`;
-                }
+                const response = await fetch(csvUrl);
+                if (!response.ok) throw new Error("試算表讀取失敗，請確認試算表已設為「知道連結的使用者皆可檢視」");
+                const csvText = await response.text();
+                
+                parseCsvToStudents(csvText);
 
                 statusEl.innerText = `🟢 同步完成！共 ${studentList.length} 位學生`;
                 statusEl.className = "bg-emerald-100 text-emerald-700 font-semibold px-2.5 py-1 rounded border border-emerald-300";
-                detailMsgEl.innerText = `最後更新時間：${new Date().toLocaleTimeString()} (照片與印章均已完成 Base64 內嵌)`;
-
-                renderStudentTable();
-                renderCertificates();
+                document.getElementById('syncDetailMsg').innerText = `最後更新時間：${new Date().toLocaleTimeString()}`;
 
             } catch (err) {
-                console.error("GAS Sync Error:", err);
-                statusEl.innerText = "⚠️ 雲端讀取失敗";
+                console.error("Sheet Sync Error:", err);
+                statusEl.innerText = "⚠️ 雲端讀取失敗 (請檢查試算表共用權限)";
                 statusEl.className = "bg-red-100 text-red-700 font-semibold px-2.5 py-1 rounded border border-red-300";
-                detailMsgEl.innerText = `錯誤原因：${err.message}`;
             } finally {
                 syncBtn.disabled = false;
                 syncBtn.classList.remove('opacity-50');
             }
+        }
+
+        // 解析試算表 CSV
+        function parseCsvToStudents(csvText) {
+            const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length <= 1) return;
+
+            const list = [];
+            for (let i = 1; i < lines.length; i++) {
+                const row = parseCSVLine(lines[i]);
+                if (!row || row.length < 2) continue;
+
+                // 判斷第 0 欄是否為核取方塊
+                let nameIdx = 0, idIdx = 1, bdayIdx = 2, gradeIdx = 3, seatIdx = 4;
+                if (row[0] === 'TRUE' || row[0] === 'FALSE' || row[0] === '') {
+                    nameIdx = 1; idIdx = 2; bdayIdx = 3; gradeIdx = 4; seatIdx = 5;
+                }
+
+                const name = (row[nameIdx] || "").trim();
+                const idCard = (row[idIdx] || "").trim();
+                const bday = (row[bdayIdx] || "").trim();
+                const grade = (row[gradeIdx] || "").trim();
+                const seatNo = (row[seatIdx] || "").trim();
+
+                if (name) {
+                    list.push({
+                        selected: true,
+                        name: name,
+                        idCard: idCard,
+                        birthday: bday,
+                        grade: grade || "六年級",
+                        seatNo: seatNo,
+                        photo: photoMap[name] || ""
+                    });
+                }
+            }
+
+            if (list.length > 0) {
+                studentList = list;
+                renderStudentTable();
+                renderCertificates();
+            }
+        }
+
+        function parseCSVLine(text) {
+            let p = '', c = false, r = [];
+            for (let i = 0; i < text.length; i++) {
+                let cc = text[i], nc = text[i+1];
+                if (cc === '"') {
+                    if (c && nc === '"') { p += '"'; i++; }
+                    else { c = !c; }
+                } else if (cc === ',' && !c) {
+                    r.push(p); p = '';
+                } else {
+                    p += cc;
+                }
+            }
+            r.push(p);
+            return r;
         }
 
         // 班級轉純年級
@@ -435,7 +447,7 @@
             return `中 華 民 國  ${rocYear}  年  ${month}  月  ${day}  日`;
         }
 
-        // 本地照片備用手動上傳
+        // 本地照片批次載入（自動轉 Base64 內嵌）
         function handlePhotoUpload(e) {
             const files = e.target.files;
             if (!files.length) return;
@@ -445,6 +457,8 @@
                 const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
                 const reader = new FileReader();
                 reader.onload = (event) => {
+                    photoMap[nameWithoutExt] = event.target.result;
+                    
                     studentList.forEach(st => {
                         if (st.name === nameWithoutExt) {
                             st.photo = event.target.result;
@@ -453,7 +467,8 @@
 
                     loadedCount++;
                     if (loadedCount === files.length) {
-                        document.getElementById('photoMatchStatus').innerText = `手動載入 ${loadedCount} 張照片完成！`;
+                        let matchedCount = studentList.filter(s => !!s.photo).length;
+                        document.getElementById('photoMatchStatus').innerText = `✅ 已載入 ${loadedCount} 張照片（成功配對 ${matchedCount} 位學生）`;
                         renderStudentTable();
                         renderCertificates();
                     }
@@ -560,10 +575,10 @@
                         <!-- ==================== 圖層 1 & 2：印章層 (背景) ==================== -->
                         <div class="seals-overlay">
                             <!-- 最底層 (z-index: 10)：學校官防大印 -->
-                            <img src="${officialSealData}" class="seal-official-img" style="width: ${offW}mm; left: ${offX}%; top: ${offY}%;" alt="官防">
+                            <img src="${officialSealData}" class="seal-official-img" style="width: ${offW}mm; left: ${offX}%; top: ${offY}%;" alt="官防" crossorigin="anonymous">
 
                             <!-- 中間層 (z-index: 20)：校長簽名章 (寬140) -->
-                            <img src="${principalSealData}" class="seal-principal-img" style="width: ${prinW}mm; left: ${prinX}%; top: ${prinY}%;" alt="校長簽名">
+                            <img src="${principalSealData}" class="seal-principal-img" style="width: ${prinW}mm; left: ${prinX}%; top: ${prinY}%;" alt="校長簽名" crossorigin="anonymous">
                         </div>
 
                         <!-- ==================== 圖層 3：最上層所有文字與照片 (z-index: 30) ==================== -->
@@ -610,6 +625,11 @@
 
                 container.appendChild(pageDiv);
             }
+        }
+
+        // 列印前確認圖片皆載入完畢
+        function printCertificates() {
+            window.print();
         }
 
         // 監聽基本設定即時刷新
