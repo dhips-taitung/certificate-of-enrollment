@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 學生照片自動提取與雲端上傳工具</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip (用來在瀏覽器端直接解壓縮與打包 Excel) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+    <!-- 頁頭 -->
+    <header class="bg-white border-b shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    📸 Excel 學生照片自動提取與上傳系統
+                </h1>
+                <p class="text-xs text-slate-500 mt-0.5">臺東縣立東海國民小學專用版 (支援 Excel 儲存格照片自動命名與同步)</p>
+            </div>
+            <div class="text-xs text-slate-500">
+                目標資料夾 ID：<span class="font-mono bg-slate-100 px-2 py-1 rounded">1AlwaUa9...N7pd</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+
+        <!-- 1. 檔案上傳拖曳區 -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+            <h2 class="font-bold text-slate-700 text-sm mb-3 flex items-center gap-2">
+                📂 步驟一：上傳包含學生照片的 Excel 檔案 (.xlsx)
+            </h2>
+
+            <label class="border-2 border-dashed border-blue-400 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition">
+                <span class="text-4xl mb-2">📊</span>
+                <span class="text-sm font-bold text-blue-700">點擊此處選取 Excel 檔案，或直接將檔案拖曳至此</span>
+                <span class="text-xs text-slate-400 mt-1">支援 A 欄為照片、B 欄為姓名之 .xlsx 格式</span>
+                <input type="file" id="excelFileInput" accept=".xlsx" class="hidden" onchange="handleExcelUpload(event)">
+            </label>
+        </div>
+
+        <!-- 2. 解析狀態與操作按鈕 -->
+        <div id="resultPanel" class="hidden space-y-4">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        🎉 解析完成！共提取 <span id="photoCount" class="text-blue-600 font-extrabold text-lg">0</span> 張學生照片
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">已自動依據試算表列號將照片精準配對為「學生姓名.jpg」</p>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <!-- 打包下載 ZIP -->
+                    <button onclick="downloadAsZip()" class="bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+                        📦 下載 ZIP 壓縮檔
+                    </button>
+                    <!-- 上傳至 Google Drive -->
+                    <button id="uploadBtn" onclick="uploadToGoogleDrive()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-md transition flex items-center gap-2">
+                        ☁️ 一鍵上傳至 Google 雲端資料夾
+                    </button>
+                </div>
+            </div>
+
+            <!-- 傳輸進度狀態 -->
+            <div id="uploadStatusBox" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-xs">
+                <div class="flex justify-between font-bold text-emerald-800 mb-1">
+                    <span id="uploadStatusText">正在上傳中...</span>
+                    <span id="uploadProgressText">0%</span>
+                </div>
+                <div class="w-full bg-emerald-200 h-2 rounded-full overflow-hidden">
+                    <div id="uploadProgressBar" class="bg-emerald-600 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <!-- 照片清單預覽網格 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-700 text-sm mb-4">🖼️ 學生照片精準對應預覽</h3>
+                <div id="previewGrid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                    <!-- 動態產出照片卡片 -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // 目標 Google Drive 資料夾 ID 與 GAS 部署網址
+        const TARGET_FOLDER_ID = '1AlwaUa9NHPqU4Lw7ysKAHTlU26VIN7pd';
+        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycby2hqt0edo7CKQBjdP8nMStt6ZqgajrS6GNUWBeH9zUQ3Ia0XcC9oEKds6S4T2q6vrM/exec;
+
+        // 儲存解析後的照片物件陣列：[{ name: "黃晨曄.jpg", blob: Blob, base64: "..." }]
+        let extractedPhotos = [];
+
+        // 處理 Excel 上傳與純前端解壓縮解析
+        async function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            extractedPhotos = [];
+            const previewGrid = document.getElementById('previewGrid');
+            previewGrid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-400 text-sm">正在深度解析 Excel 結構與圖片座標...</div>';
+            document.getElementById('resultPanel').classList.remove('hidden');
+
+            try {
+                const zip = await JSZip.loadAsync(file);
+
+                // 1. 解析共用字串表 (sharedStrings.xml)
+                const sharedStrings = [];
+                const sstFile = zip.file('xl/sharedStrings.xml');
+                if (sstFile) {
+                    const sstXml = await sstFile.async('text');
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(sstXml, 'application/xml');
+                    const siElements = xmlDoc.getElementsByTagName('si');
+                    for (let i = 0; i < siElements.length; i++) {
+                        const t = siElements[i].getElementsByTagName('t')[0];
+                        sharedStrings.push(t ? t.textContent : '');
+                    }
+                }
+
+                // 2. 解析工作表工作表 (sheet1.xml)，建立 列號 ➔ 姓名 對應 (Row ➔ Name)
+                const sheetFile = zip.file('xl/worksheets/sheet1.xml');
+                if (!sheetFile) throw new Error('找不到工作表檔案 (sheet1.xml)');
+                
+                const sheetXml = await sheetFile.async('text');
+                const parser = new DOMParser();
+                const sheetDoc = parser.parseFromString(sheetXml, 'application/xml');
+                const rowElements = sheetDoc.getElementsByTagName('row');
+                
+                const rowToNameMap = {};
+                for (let i = 0; i < rowElements.length; i++) {
+                    const row = rowElements[i];
+                    const rowIdx = parseInt(row.getAttribute('r'), 10);
+                    const cElements = row.getElementsByTagName('c');
+
+                    for (let j = 0; j < cElements.length; j++) {
+                        const cell = cElements[j];
+                        const cellRef = cell.getAttribute('r'); // 例如 "B2"
+                        // 判斷是否為 B 欄
+                        if (cellRef && cellRef.startsWith('B')) {
+                            const isShared = cell.getAttribute('t') === 's';
+                            const vElem = cell.getElementsByTagName('v')[0];
+                            if (vElem) {
+                                let name = vElem.textContent.trim();
+                                if (isShared) {
+                                    name = sharedStrings[parseInt(name, 10)] || name;
+                                }
+                                if (name && name !== '姓名') {
+                                    rowToNameMap[rowIdx] = name.trim();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. 解析圖片關聯表 (.rels)
+                const relsFile = zip.file('xl/drawings/_rels/drawing1.xml.rels') || zip.file('xl/cellimages/_rels/cellimages.xml.rels');
+                const ridToPathMap = {};
+                if (relsFile) {
+                    const relsXml = await relsFile.async('text');
+                    const relsDoc = parser.parseFromString(relsXml, 'application/xml');
+                    const relNodes = relsDoc.getElementsByTagName('Relationship');
+                    for (let i = 0; i < relNodes.length; i++) {
+                        const id = relNodes[i].getAttribute('Id');
+                        let target = relNodes[i].getAttribute('Target');
+                        target = target.replace('../', 'xl/');
+                        if (!target.startsWith('xl/')) target = 'xl/' + target;
+                        ridToPathMap[id] = target;
+                    }
+                }
+
+                // 4. 解析繪圖座標 (drawing1.xml / cellimages.xml)
+                const drawingFile = zip.file('xl/drawings/drawing1.xml') || zip.file('xl/cellimages/cellimages.xml');
+                if (drawingFile) {
+                    const drawingXml = await drawingFile.async('text');
+                    const drawDoc = parser.parseFromString(drawingXml, 'application/xml');
+
+                    // 支援標準 twoCellAnchor / oneCellAnchor / cellImage
+                    const anchors = [...drawDoc.getElementsByTagName('xdr:twoCellAnchor'), ...drawDoc.getElementsByTagName('xdr:oneCellAnchor'), ...drawDoc.getElementsByTagName('cellImage')];
+
+                    for (let i = 0; i < anchors.length; i++) {
+                        const anchor = anchors[i];
+                        const fromRowElem = anchor.getElementsByTagName('xdr:row')[0] || anchor.getElementsByTagName('row')[0];
+                        const blipElem = anchor.getElementsByTagName('a:blip')[0] || anchor.getElementsByTagName('blip')[0];
+
+                        if (fromRowElem && blipElem) {
+                            const row0Based = parseInt(fromRowElem.textContent, 10);
+                            const actualRow = row0Based + 1; // 轉為 1-based 列號
+                            const rId = blipElem.getAttribute('r:embed') || blipElem.getAttribute('r:link');
+                            const imagePath = ridToPathMap[rId];
+
+                            const studentName = rowToNameMap[actualRow];
+
+                            if (studentName && imagePath && zip.file(imagePath)) {
+                                const imgBlob = await zip.file(imagePath).async('blob');
+                                const base64 = await blobToBase64(imgBlob);
+
+                                extractedPhotos.push({
+                                    name: `${studentName}.jpg`,
+                                    studentName: studentName,
+                                    blob: imgBlob,
+                                    base64: base64
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // 渲染提取結果
+                renderPreview();
+
+            } catch (err) {
+                console.error(err);
+                alert('解析 Excel 失敗：' + err.message);
+                previewGrid.innerHTML = `<div class="col-span-full text-center py-10 text-red-500 text-sm">解析失敗，請確認檔案格式是否正確。</div>`;
+            }
+        }
+
+        // 渲染照片預覽卡片
+        function renderPreview() {
+            const previewGrid = document.getElementById('previewGrid');
+            previewGrid.innerHTML = '';
+            document.getElementById('photoCount').innerText = extractedPhotos.length;
+
+            if (extractedPhotos.length === 0) {
+                previewGrid.innerHTML = '<div class="col-span-full text-center py-10 text-slate-400 text-sm">未在 Excel 中偵測到可提取的學生照片。</div>';
+                return;
+            }
+
+            extractedPhotos.forEach((item) => {
+                const card = document.createElement('div');
+                card.className = 'border rounded-xl p-2 bg-slate-50 flex flex-col items-center gap-1.5 shadow-sm text-center';
+                
+                const imgUrl = URL.createObjectURL(item.blob);
+                card.innerHTML = `
+                    <div class="w-full h-24 bg-white rounded-lg overflow-hidden border flex items-center justify-center">
+                        <img src="${imgUrl}" class="w-full h-full object-cover" alt="${item.studentName}">
+                    </div>
+                    <span class="text-xs font-bold text-slate-800 truncate w-full">${item.studentName}</span>
+                    <span class="text-[10px] text-slate-400 font-mono truncate w-full">${item.name}</span>
+                `;
+                previewGrid.appendChild(card);
+            });
+        }
+
+        // 一鍵下載 ZIP 壓縮檔
+        async function downloadAsZip() {
+            if (extractedPhotos.length === 0) return;
+            const zip = new JSZip();
+            extractedPhotos.forEach(p => {
+                zip.file(p.name, p.blob);
+            });
+
+            const content = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(content);
+            a.download = `學生照片全體_${extractedPhotos.length}張.zip`;
+            a.click();
+        }
+
+        // 一鍵上傳至 Google Drive
+        async function uploadToGoogleDrive() {
+            if (extractedPhotos.length === 0) return;
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            const statusBox = document.getElementById('uploadStatusBox');
+            const statusText = document.getElementById('uploadStatusText');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressText = document.getElementById('uploadProgressText');
+
+            uploadBtn.disabled = true;
+            statusBox.classList.remove('hidden');
+            statusText.innerText = '正在傳輸照片至 Google 雲端資料夾...';
+            progressBar.style.width = '30%';
+            progressText.innerText = '30%';
+
+            try {
+                // 將資料打包為 JSON 傳送至 GAS
+                const payload = {
+                    folderId: TARGET_FOLDER_ID,
+                    files: extractedPhotos.map(p => ({
+                        name: p.name,
+                        base64: p.base64
+                    }))
+                };
+
+                progressBar.style.width = '70%';
+                progressText.innerText = '70%';
+
+                const response = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' }, // 避免觸發預檢
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    progressBar.style.width = '100%';
+                    progressText.innerText = '100%';
+                    statusText.innerText = `🎉 成功將全部 ${result.count} 張學生照片上傳至 Google 雲端資料夾！`;
+                    alert(`🎉 上傳成功！已將 ${result.count} 張照片依姓名命名並儲存至 Google 雲端資料夾！`);
+                } else {
+                    throw new Error(result.message || '上傳失敗');
+                }
+            } catch (err) {
+                console.error(err);
+                statusText.innerText = '❌ 上傳失敗：' + err.message;
+                alert('上傳失敗：' + err.message + '\n\n您亦可點擊「下載 ZIP 壓縮檔」將照片存至電腦備用。');
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+    </script>
+</body>
+</html>
