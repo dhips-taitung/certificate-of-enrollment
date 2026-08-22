@@ -152,17 +152,17 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                 <div>
                     <label class="block text-slate-300 mb-1">1. 學生名冊試算表網址/ID</label>
-                    <input type="text" id="cfgSheetId" placeholder="試算表 ID 或 完整網址" 
+                    <input type="text" id="cfgSheetId" autocomplete="off" placeholder="試算表 ID 或 完整網址" 
                            class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1">2. 學生照片資料夾網址/ID</label>
-                    <input type="text" id="cfgPhotoFolderId" placeholder="照片資料夾 ID 或 完整網址" 
+                    <input type="text" id="cfgPhotoFolderId" autocomplete="off" placeholder="照片資料夾 ID 或 完整網址" 
                            class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
                 </div>
                 <div>
                     <label class="block text-slate-300 mb-1">3. 印章資料夾 ID (無自訂則留空使用原印章)</label>
-                    <input type="text" id="cfgSealFolderId" placeholder="1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt" 
+                    <input type="text" id="cfgSealFolderId" autocomplete="off" placeholder="1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt" 
                            class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
                 </div>
             </div>
@@ -191,19 +191,19 @@
                 <div class="space-y-2.5 text-xs">
                     <div>
                         <label class="block text-gray-600 mb-1">學校抬頭名稱</label>
-                        <input type="text" id="schoolName" value="臺東縣立東海國民小學在學證明書" class="w-full border rounded px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="schoolName" autocomplete="off" value="臺東縣立東海國民小學在學證明書" class="w-full border rounded px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 font-bold text-gray-800">
                     </div>
                     <div>
                         <label class="block text-gray-600 mb-1">文號前綴與起始號 (自動連號)</label>
                         <div class="flex gap-2">
-                            <input type="text" id="docPrefix" value="(113)東海小在證字第" class="w-2/3 border rounded px-2.5 py-1.5">
-                            <input type="text" id="docStartNum" value="463-1" class="w-1/3 border rounded px-2 py-1.5 text-center font-mono">
+                            <input type="text" id="docPrefix" autocomplete="off" value="(113)東海小在證字第" class="w-2/3 border rounded px-2.5 py-1.5">
+                            <input type="text" id="docStartNum" autocomplete="off" value="463-1" class="w-1/3 border rounded px-2 py-1.5 text-center font-mono">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-gray-600 mb-1">就讀學期</label>
-                            <input type="text" id="termInput" value="第1學期" class="w-full border rounded px-2.5 py-1.5">
+                            <input type="text" id="termInput" autocomplete="off" value="第1學期" class="w-full border rounded px-2.5 py-1.5">
                         </div>
                         <div>
                             <label class="block text-gray-600 mb-1">發證日期</label>
@@ -303,20 +303,29 @@
     </div>
 
     <script>
-        // 固定的 GAS 部署網址 (前端不顯示，後端直接呼叫此網址)
+        // 固定的 GAS 部署網址
         const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwN_QFktKLlqseSi30sXcNwikBy-0IlLrx6tq9Dw5T0gnxc1xvaCqjAjX4rl9StQ5q9qA/exec';
         
-        // 預設 ID
+        // 預設 ID 與設定
         const DEFAULT_SHEET_ID = '12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw';
         const DEFAULT_PHOTO_FOLDER = '1AlwaUa9NHPqU4Lw7ysKAHTlU26VIN7pd';
         const DEFAULT_SEAL_FOLDER = '1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt';
+        const DEFAULT_SCHOOL_NAME = '臺東縣立東海國民小學在學證明書';
 
         let officialSealData = '';
         let principalSealData = '';
         let studentList = [];
 
         window.addEventListener('DOMContentLoaded', () => {
-            // 讀取 localStorage 記憶
+            // 清理可能被瀏覽器誤存的學校名稱（若含有 Drive ID 格式字串則強制恢復預設）
+            let savedSchoolName = localStorage.getItem('cfgSchoolName');
+            if (!savedSchoolName || /^[a-zA-Z0-9_-]{25,}$/.test(savedSchoolName.trim())) {
+                savedSchoolName = DEFAULT_SCHOOL_NAME;
+                localStorage.setItem('cfgSchoolName', DEFAULT_SCHOOL_NAME);
+            }
+            document.getElementById('schoolName').value = savedSchoolName;
+
+            // 讀取其他設定
             document.getElementById('cfgSheetId').value = localStorage.getItem('cfgSheetId') || DEFAULT_SHEET_ID;
             document.getElementById('cfgPhotoFolderId').value = localStorage.getItem('cfgPhotoFolderId') || DEFAULT_PHOTO_FOLDER;
             document.getElementById('cfgSealFolderId').value = localStorage.getItem('cfgSealFolderId') || DEFAULT_SEAL_FOLDER;
@@ -337,6 +346,7 @@
             localStorage.setItem('cfgSheetId', document.getElementById('cfgSheetId').value.trim());
             localStorage.setItem('cfgPhotoFolderId', document.getElementById('cfgPhotoFolderId').value.trim());
             localStorage.setItem('cfgSealFolderId', document.getElementById('cfgSealFolderId').value.trim());
+            localStorage.setItem('cfgSchoolName', document.getElementById('schoolName').value.trim());
         }
 
         // 預設王小明範例
@@ -375,7 +385,6 @@
             syncBtn.classList.add('opacity-50');
 
             try {
-                // 組合 Query 參數
                 const url = new URL(gasUrl);
                 if (sheetId) url.searchParams.append('spreadsheetId', sheetId);
                 if (photoFolderId) url.searchParams.append('photoFolderId', photoFolderId);
@@ -529,7 +538,8 @@
                 return;
             }
 
-            const schoolTitle = document.getElementById('schoolName').value;
+            // 取得正確的學校抬頭名稱
+            const schoolTitle = document.getElementById('schoolName').value.trim() || DEFAULT_SCHOOL_NAME;
             const termText = document.getElementById('termInput').value;
             const dateSpaced = getIssueDateMinguoSpaced();
 
@@ -608,7 +618,10 @@
         }
 
         ['schoolName', 'docPrefix', 'docStartNum', 'termInput', 'issueDateInput'].forEach(id => {
-            document.getElementById(id).addEventListener('input', renderCertificates);
+            document.getElementById(id).addEventListener('input', () => {
+                saveConfig();
+                renderCertificates();
+            });
         });
     </script>
 </body>
