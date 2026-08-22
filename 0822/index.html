@@ -140,33 +140,28 @@
     <!-- 後台設定與匯入區塊 -->
     <div class="no-print max-w-7xl mx-auto p-4 space-y-4">
         
-        <!-- 外接專案 ID 設定面板 -->
+        <!-- 外接專案來源設定 (已移除 GAS 網址輸入框，維持 3 欄排版) -->
         <div class="bg-slate-800 text-white rounded-xl p-4 shadow-md">
             <div class="flex justify-between items-center mb-3">
                 <h2 class="font-bold text-sm text-slate-200 flex items-center gap-2">
-                    🌐 外接專案來源設定 (支援貼上完整網址或 ID，設定會自動記憶)
+                    🌐 外接專案來源設定 (支援直接貼上完整網址或 ID，設定會自動儲存)
                 </h2>
                 <span class="text-[11px] text-amber-300">⚠️ 跨帳號檔案請確保已開啟「知道連結的使用者皆可檢視」</span>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                 <div>
-                    <label class="block text-slate-300 mb-1">1. GAS 部署網址</label>
-                    <input type="text" id="cfgGasUrl" placeholder="https://script.google.com/.../exec" 
-                           class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
-                </div>
-                <div>
-                    <label class="block text-slate-300 mb-1">2. 學生名冊試算表網址/ID</label>
+                    <label class="block text-slate-300 mb-1">1. 學生名冊試算表網址/ID</label>
                     <input type="text" id="cfgSheetId" placeholder="試算表 ID 或 完整網址" 
                            class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
                 </div>
                 <div>
-                    <label class="block text-slate-300 mb-1">3. 學生照片資料夾網址/ID</label>
+                    <label class="block text-slate-300 mb-1">2. 學生照片資料夾網址/ID</label>
                     <input type="text" id="cfgPhotoFolderId" placeholder="照片資料夾 ID 或 完整網址" 
                            class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
                 </div>
                 <div>
-                    <label class="block text-slate-300 mb-1">4. 印章資料夾 ID (無自訂則留空使用原印章)</label>
+                    <label class="block text-slate-300 mb-1">3. 印章資料夾 ID (無自訂則留空使用原印章)</label>
                     <input type="text" id="cfgSealFolderId" placeholder="1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt" 
                            class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
                 </div>
@@ -308,8 +303,10 @@
     </div>
 
     <script>
-        // 預設設定常數
-        const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwN_QFktKLlqseSi30sXcNwikBy-0IlLrx6tq9Dw5T0gnxc1xvaCqjAjX4rl9StQ5q9qA/exec';
+        // 固定後端 GAS 部署網址
+        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwN_QFktKLlqseSi30sXcNwikBy-0IlLrx6tq9Dw5T0gnxc1xvaCqjAjX4rl9StQ5q9qA/exec';
+
+        // 預設 ID 設定
         const DEFAULT_SHEET_ID = '12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw';
         const DEFAULT_PHOTO_FOLDER = '1AlwaUa9NHPqU4Lw7ysKAHTlU26VIN7pd';
         const DEFAULT_SEAL_FOLDER = '1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt';
@@ -319,13 +316,12 @@
         let studentList = [];
 
         window.addEventListener('DOMContentLoaded', () => {
-            // 讀取 localStorage 記憶
-            document.getElementById('cfgGasUrl').value = localStorage.getItem('cfgGasUrl') || DEFAULT_GAS_URL;
+            // 讀取 localStorage 記憶（若無則套用預設）
             document.getElementById('cfgSheetId').value = localStorage.getItem('cfgSheetId') || DEFAULT_SHEET_ID;
             document.getElementById('cfgPhotoFolderId').value = localStorage.getItem('cfgPhotoFolderId') || DEFAULT_PHOTO_FOLDER;
             document.getElementById('cfgSealFolderId').value = localStorage.getItem('cfgSealFolderId') || DEFAULT_SEAL_FOLDER;
 
-            // 預設發證日期
+            // 預設發證日期為今日
             const today = new Date();
             const yyyy = today.getFullYear();
             const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -338,13 +334,12 @@
 
         // 儲存設定至 localStorage
         function saveConfig() {
-            localStorage.setItem('cfgGasUrl', document.getElementById('cfgGasUrl').value.trim());
             localStorage.setItem('cfgSheetId', document.getElementById('cfgSheetId').value.trim());
             localStorage.setItem('cfgPhotoFolderId', document.getElementById('cfgPhotoFolderId').value.trim());
             localStorage.setItem('cfgSealFolderId', document.getElementById('cfgSealFolderId').value.trim());
         }
 
-        // 預設王小明範例
+        // 預設範例
         function loadSampleData() {
             studentList = [
                 {
@@ -365,7 +360,6 @@
         async function fetchCloudData() {
             saveConfig();
 
-            const gasUrl = document.getElementById('cfgGasUrl').value.trim() || DEFAULT_GAS_URL;
             const sheetId = document.getElementById('cfgSheetId').value.trim();
             const photoFolderId = document.getElementById('cfgPhotoFolderId').value.trim();
             const sealFolderId = document.getElementById('cfgSealFolderId').value.trim();
@@ -380,8 +374,7 @@
             syncBtn.classList.add('opacity-50');
 
             try {
-                // 組合 Query 參數
-                const url = new URL(gasUrl);
+                const url = new URL(GAS_API_URL);
                 if (sheetId) url.searchParams.append('spreadsheetId', sheetId);
                 if (photoFolderId) url.searchParams.append('photoFolderId', photoFolderId);
                 if (sealFolderId) url.searchParams.append('sealFolderId', sealFolderId);
