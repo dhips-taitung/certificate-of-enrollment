@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在學證明書批次產生系統 - 整合 Excel 匯入版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (解析 Excel 表格內容) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- JSZip (解構 Excel 內部圖片與打包 ZIP) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @font-face {
+            font-family: 'DFKai-SB';
+            src: local('DFKai-SB'), local('BiauKai'), local('標楷體');
+        }
+
+        .font-kai {
+            font-family: 'DFKai-SB', 'BiauKai', '標楷體', 'TW-Kai', 'Times New Roman', serif;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0;
+        }
+
+        @media screen {
+            .preview-container {
+                background-color: #525659;
+                padding: 24px;
+            }
+            .a4-page {
+                width: 210mm;
+                min-height: 297mm;
+                background: white;
+                margin: 0 auto 24px auto;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.35);
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                padding: 6mm 8mm;
+            }
+        }
+
+        @media print {
+            body {
+                background: transparent;
+                margin: 0;
+                padding: 0;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .preview-container {
+                padding: 0 !important;
+                background: transparent !important;
+            }
+            .a4-page {
+                width: 210mm;
+                height: 297mm;
+                page-break-after: always;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                padding: 6mm 8mm;
+            }
+        }
+
+        .cert-card {
+            width: 100%;
+            height: 139mm;
+            border: 2.5px solid #000;
+            box-sizing: border-box;
+            position: relative;
+            padding: 9mm 12mm 6mm 12mm;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+
+        .layer-text {
+            position: relative;
+            z-index: 30;
+            background: transparent;
+        }
+
+        .seals-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .seal-official-img {
+            position: absolute;
+            z-index: 10;
+            object-fit: contain;
+            opacity: 0.85;
+            mix-blend-mode: multiply;
+            transform: translate(-50%, -50%);
+        }
+
+        .seal-principal-img {
+            position: absolute;
+            z-index: 20;
+            object-fit: contain;
+            opacity: 0.95;
+            mix-blend-mode: multiply;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+
+    <!-- 頂部控制列 -->
+    <div class="no-print bg-white border-b shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    🎓 在學證明書批次產生系統 <span class="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded">外接專案版</span>
+                </h1>
+                <p class="text-xs text-gray-500">支援 Excel 照片名冊自動擷取 · 跨帳號試算表同步 · A4 雙併 A5</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="syncBtn" onclick="fetchCloudData()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg shadow flex items-center gap-1.5 transition text-sm">
+                    🔄 同步雲端名冊與照片
+                </button>
+                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg shadow flex items-center gap-1.5 transition text-sm">
+                    🖨️ 列印 / 另存為 PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 後台設定與匯入區塊 -->
+    <div class="no-print max-w-7xl mx-auto p-4 space-y-4">
+        
+        <!-- 1. 外接專案 ID 設定面板 -->
+        <div class="bg-slate-800 text-white rounded-xl p-4 shadow-md">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="font-bold text-sm text-slate-200 flex items-center gap-2">
+                    🌐 雲端資料來源設定 (支援貼上完整網址或 ID，設定會自動記憶)
+                </h2>
+                <span class="text-[11px] text-amber-300">⚠️ 跨帳號檔案請確保已開啟「知道連結的使用者皆可檢視」</span>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div>
+                    <label class="block text-slate-300 mb-1">1. 學生名冊試算表網址/ID (寫入 A2:E)</label>
+                    <input type="text" id="cfgSheetId" autocomplete="off" placeholder="試算表 ID 或 完整網址" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">2. 學生照片資料夾網址/ID (存入 姓名.jpg)</label>
+                    <input type="text" id="cfgPhotoFolderId" autocomplete="off" placeholder="照片資料夾 ID 或 完整網址" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
+                </div>
+                <div>
+                    <label class="block text-slate-300 mb-1">3. 印章資料夾 ID (無自訂則留空使用原印章)</label>
+                    <input type="text" id="cfgSealFolderId" autocomplete="off" placeholder="1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt" 
+                           class="w-full bg-slate-700 border border-slate-600 rounded px-2.5 py-1.5 text-white font-mono placeholder-slate-400 focus:ring-1 focus:ring-blue-400">
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Excel 學生照片與名冊一鍵擷取上傳區塊 -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 shadow-sm">
+            <div class="flex flex-wrap justify-between items-center mb-2.5 gap-2">
+                <div>
+                    <h2 class="font-bold text-blue-900 text-sm flex items-center gap-1.5">
+                        📊 Excel 學生照片與名冊自動擷取匯入
+                    </h2>
+                    <p class="text-xs text-blue-700">自動提取 Excel 儲存格相片以 B 欄命名為「姓名.jpg」，並將 B2:F 名冊寫入 Google 試算表 A2:E</p>
+                </div>
+            </div>
+
+            <!-- 上傳拖曳區 -->
+            <div id="dropZone" class="border-2 border-dashed border-blue-400 hover:border-blue-600 bg-white/80 hover:bg-white rounded-lg p-5 flex flex-col items-center justify-center cursor-pointer transition" onclick="document.getElementById('excelFileInput').click()">
+                <span class="text-3xl mb-1">📥</span>
+                <span class="text-xs font-bold text-blue-800">點此選取 Excel 檔案 (.xlsx) 或拖曳至此</span>
+                <span class="text-[11px] text-gray-500 mt-0.5">自動完成相片配對與名冊擷取</span>
+                <input type="file" id="excelFileInput" accept=".xlsx" class="hidden" onchange="handleExcelUpload(event)">
+            </div>
+
+            <!-- 解析完成操作列 -->
+            <div id="excelResultPanel" class="hidden mt-3 space-y-3">
+                <div class="flex flex-wrap justify-between items-center bg-white p-3 rounded-lg border border-blue-200 gap-2">
+                    <div class="text-xs text-gray-700">
+                        🎉 解析完成：已擷取 <span id="parsedPhotoCount" class="font-bold text-emerald-600 text-sm">0</span> 張照片，<span id="parsedRosterCount" class="font-bold text-blue-600 text-sm">0</span> 筆學生名冊！
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="downloadParsedZip()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded shadow transition">
+                            📦 下載照片 ZIP
+                        </button>
+                        <button id="cloudUploadBtn" onclick="uploadExcelDataToCloud()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-1.5 rounded shadow transition flex items-center gap-1">
+                            ☁️ 一鍵寫入試算表並上傳照片
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 上傳進度條 -->
+                <div id="uploadStatusBox" class="hidden bg-white border border-blue-200 rounded-lg p-3 text-xs">
+                    <div class="flex justify-between font-semibold text-blue-800 mb-1">
+                        <span id="uploadStatusText">正在上傳中...</span>
+                        <span id="uploadProgressText">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                        <div id="uploadProgressBar" class="bg-blue-600 h-full w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 雲端連線狀態提示列 -->
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-emerald-800">連線狀態：</span>
+                <span id="syncStatus" class="bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded border border-emerald-300">
+                    🟢 系統就緒
+                </span>
+            </div>
+            <div id="syncDetail" class="text-gray-500 text-[11px]">
+                點擊「同步雲端名冊與照片」按鈕以更新資料
+            </div>
+        </div>
+
+        <!-- 4. 設定與名冊控制 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            
+            <!-- 1. 基本設定 -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
+                    ⚙️ 1. 證明書基本資料
+                </h2>
+                <div class="space-y-2.5 text-xs">
+                    <div>
+                        <label class="block text-gray-600 mb-1">學校抬頭名稱</label>
+                        <input type="text" id="schoolName" autocomplete="off" value="臺東縣立東海國民小學在學證明書" class="w-full border rounded px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 font-bold text-gray-800">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 mb-1">文號前綴與起始號 (自動連號)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="docPrefix" autocomplete="off" value="(113)東海小在證字第" class="w-2/3 border rounded px-2.5 py-1.5">
+                            <input type="text" id="docStartNum" autocomplete="off" value="463-1" class="w-1/3 border rounded px-2 py-1.5 text-center font-mono">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-gray-600 mb-1">就讀學期</label>
+                            <input type="text" id="termInput" autocomplete="off" value="第1學期" class="w-full border rounded px-2.5 py-1.5">
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 mb-1">發證日期</label>
+                            <input type="date" id="issueDateInput" class="w-full border rounded px-2.5 py-1.5">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 印章微調控制 -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
+                    🔴 2. 官防與校長印章設定
+                </h2>
+                <div class="space-y-2 text-[11px]">
+                    <div class="p-2 bg-gray-50 rounded border">
+                        <div class="font-bold text-gray-700 mb-1 flex justify-between">
+                            <span>官防大印 (底層)</span>
+                            <span id="sealOffStatus" class="text-emerald-600 font-normal">使用中</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1">
+                            <label>寬: <input type="number" id="sealOffW" value="52" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
+                            <label>X: <input type="number" id="sealOffX" value="52" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                            <label>Y: <input type="number" id="sealOffY" value="75" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                        </div>
+                    </div>
+
+                    <div class="p-2 bg-gray-50 rounded border">
+                        <div class="font-bold text-gray-700 mb-1 flex justify-between">
+                            <span>校長大章 (中間層)</span>
+                            <span id="sealPrinStatus" class="text-emerald-600 font-normal">使用中</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1">
+                            <label>寬: <input type="number" id="sealPrinW" value="140" class="w-10 border rounded px-1" oninput="renderCertificates()">mm</label>
+                            <label>X: <input type="number" id="sealPrinX" value="55" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                            <label>Y: <input type="number" id="sealPrinY" value="73" class="w-10 border rounded px-1" oninput="renderCertificates()">%</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 本機照片備用上傳 -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-1.5 text-sm">
+                    📁 3. 本機照片手動補傳 (備用)
+                </h2>
+                <p class="text-[11px] text-gray-500 mb-2">若個別相片缺漏，可直接手動補傳覆蓋：</p>
+                <label class="border-2 border-dashed border-gray-300 hover:border-blue-500 rounded-lg p-2.5 flex flex-col items-center justify-center cursor-pointer bg-gray-50 transition">
+                    <span class="text-xl mb-0.5">📂</span>
+                    <span class="text-xs text-blue-600 font-medium">選取補傳相片 (姓名.jpg)</span>
+                    <input type="file" id="photoFilesInput" multiple accept="image/*" class="hidden" onchange="handleLocalPhotoUpload(event)">
+                </label>
+                <div id="photoMatchStatus" class="mt-1.5 text-xs text-gray-600 font-medium">支援本機照片替換</div>
+            </div>
+        </div>
+
+        <!-- 5. 學生名冊管理清單 -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+            <div class="flex justify-between items-center border-b pb-2 mb-3">
+                <div>
+                    <h2 class="font-bold text-gray-700 text-sm flex items-center gap-1.5">
+                        📋 學生名冊列表 (<span id="studentCount">1</span> 人)
+                    </h2>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="loadSampleData()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs px-2.5 py-1 rounded transition">
+                        重置王小明範例
+                    </button>
+                </div>
+            </div>
+
+            <!-- 學生清單預覽表 -->
+            <div class="overflow-x-auto max-h-56 overflow-y-auto border rounded">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-100 border-b sticky top-0">
+                        <tr>
+                            <th class="p-2 w-10 text-center"><input type="checkbox" id="selectAll" checked onchange="toggleSelectAll(this)"></th>
+                            <th class="p-2">姓名</th>
+                            <th class="p-2">身分證字號</th>
+                            <th class="p-2">生日(西元)</th>
+                            <th class="p-2">班級 (自動轉年級)</th>
+                            <th class="p-2">座號</th>
+                            <th class="p-2">相片狀態</th>
+                            <th class="p-2 text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTableBody" class="divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 預覽與列印區域 -->
+    <div class="preview-container">
+        <div id="pagesOutput"></div>
+    </div>
+
+    <script>
+        // 固定的 GAS 部署網址
+        const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwdufWS2oXLtcI0dFQNyHXIVYMCHlgffVYM36tWYyRoULz2jQocnSivackm-BHaDJ13/exec';
+        
+        // 預設 ID 與設定
+        const DEFAULT_SHEET_ID = '12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw';
+        const DEFAULT_PHOTO_FOLDER = '1AlwaUa9NHPqU4Lw7ysKAHTlU26VIN7pd';
+        const DEFAULT_SEAL_FOLDER = '1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt';
+        const DEFAULT_SCHOOL_NAME = '臺東縣立東海國民小學在學證明書';
+
+        let officialSealData = '';
+        let principalSealData = '';
+        let studentList = [];
+
+        // 存放從 Excel 解析出的資料
+        let parsedExtractedStudents = []; // [{ name, fileName, blob, base64 }]
+        let parsedRosterRows = []; // [[姓名, 身分證, 生日, 班級, 座號], ...]
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // 初始化學校名稱
+            let savedSchoolName = localStorage.getItem('cfgSchoolName');
+            if (!savedSchoolName || /^[a-zA-Z0-9_-]{25,}$/.test(savedSchoolName.trim())) {
+                savedSchoolName = DEFAULT_SCHOOL_NAME;
+                localStorage.setItem('cfgSchoolName', DEFAULT_SCHOOL_NAME);
+            }
+            document.getElementById('schoolName').value = savedSchoolName;
+
+            // 讀取其他設定
+            document.getElementById('cfgSheetId').value = localStorage.getItem('cfgSheetId') || DEFAULT_SHEET_ID;
+            document.getElementById('cfgPhotoFolderId').value = localStorage.getItem('cfgPhotoFolderId') || DEFAULT_PHOTO_FOLDER;
+            document.getElementById('cfgSealFolderId').value = localStorage.getItem('cfgSealFolderId') || DEFAULT_SEAL_FOLDER;
+
+            // 預設發證日期
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('issueDateInput').value = `${yyyy}-${mm}-${dd}`;
+            
+            // 初始化拖曳事件
+            initDropZone();
+
+            loadSampleData();
+            fetchCloudData();
+        });
+
+        function saveConfig() {
+            localStorage.setItem('cfgSheetId', document.getElementById('cfgSheetId').value.trim());
+            localStorage.setItem('cfgPhotoFolderId', document.getElementById('cfgPhotoFolderId').value.trim());
+            localStorage.setItem('cfgSealFolderId', document.getElementById('cfgSealFolderId').value.trim());
+            localStorage.setItem('cfgSchoolName', document.getElementById('schoolName').value.trim());
+        }
+
+        // ================= 拖曳與 Excel 深度解析核心 =================
+        function initDropZone() {
+            const dropZone = document.getElementById('dropZone');
+            ['dragenter', 'dragover'].forEach(name => {
+                dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('border-blue-600', 'bg-blue-100/60'); });
+            });
+            ['dragleave', 'drop'].forEach(name => {
+                dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('border-blue-600', 'bg-blue-100/60'); });
+            });
+            dropZone.addEventListener('drop', (e) => {
+                if (e.dataTransfer.files.length) {
+                    processExcelFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        function handleExcelUpload(e) {
+            if (e.target.files.length) {
+                processExcelFile(e.target.files[0]);
+            }
+        }
+
+        async function processExcelFile(file) {
+            parsedExtractedStudents = [];
+            parsedRosterRows = [];
+
+            const resultPanel = document.getElementById('excelResultPanel');
+            resultPanel.classList.remove('hidden');
+            document.getElementById('uploadStatusBox').classList.add('hidden');
+
+            try {
+                // 1. 使用 SheetJS 解析 Excel 表格 (B2:F)
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const sheetJson = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+
+                const studentMetaList = [];
+
+                // 從第 2 列開始解析 (index 1)
+                for (let r = 1; r < sheetJson.length; r++) {
+                    const row = sheetJson[r];
+                    if (!row || row.length === 0) continue;
+
+                    // 欄位對應：B=姓名(1), C=身分證(2), D=生日(3), E=班級(4), F=座號(5)
+                    let name = String(row[1] || row[0] || '').trim();
+                    if (!name || name === '姓名' || name === '學生姓名') continue;
+
+                    let idCard = String(row[2] || '').trim();
+                    let bday = String(row[3] || '').trim();
+                    let grade = String(row[4] || '').trim();
+                    let seatNo = String(row[5] || '').trim();
+
+                    studentMetaList.push({
+                        rowIdx: r + 1,
+                        name: name,
+                        idCard: idCard,
+                        birthday: bday,
+                        grade: grade,
+                        seatNo: seatNo
+                    });
+
+                    // 準備寫入試算表 A2:E 的資料列
+                    parsedRosterRows.push([name, idCard, bday, grade, seatNo]);
+                }
+
+                // 2. 使用 JSZip 解壓縮 Excel 內部媒體檔案
+                const zip = await JSZip.loadAsync(file);
+                const mediaFiles = {};
+                for (const path in zip.files) {
+                    if (path.startsWith('xl/media/') && !zip.files[path].dir) {
+                        mediaFiles[path] = zip.files[path];
+                    }
+                }
+
+                // 3. 解析關聯檔 rels
+                const relsMap = {};
+                for (const path in zip.files) {
+                    if (path.includes('_rels') && path.endsWith('.rels')) {
+                        const xmlStr = await zip.files[path].async('text');
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(xmlStr, 'application/xml');
+                        const rels = doc.getElementsByTagName('Relationship');
+                        for (let i = 0; i < rels.length; i++) {
+                            const id = rels[i].getAttribute('Id');
+                            let target = rels[i].getAttribute('Target');
+                            target = target.replace('../', 'xl/');
+                            if (!target.startsWith('xl/')) target = 'xl/' + target;
+                            relsMap[id] = target;
+                        }
+                    }
+                }
+
+                // 4. 解析圖片在各 Row 的分佈
+                const rowToImageBlobMap = {};
+                for (const path in zip.files) {
+                    if ((path.includes('drawings/drawing') || path.includes('cellimages')) && path.endsWith('.xml')) {
+                        const xmlStr = await zip.files[path].async('text');
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(xmlStr, 'application/xml');
+                        const anchors = [...doc.getElementsByTagName('xdr:twoCellAnchor'), ...doc.getElementsByTagName('xdr:oneCellAnchor'), ...doc.getElementsByTagName('etc:cellImage'), ...doc.getElementsByTagName('cellImage')];
+
+                        for (let i = 0; i < anchors.length; i++) {
+                            const anchor = anchors[i];
+                            const fromRowElem = anchor.getElementsByTagName('xdr:row')[0] || anchor.getElementsByTagName('row')[0];
+                            const blipElem = anchor.getElementsByTagName('a:blip')[0] || anchor.getElementsByTagName('blip')[0];
+
+                            if (fromRowElem && blipElem) {
+                                const row0Based = parseInt(fromRowElem.textContent, 10);
+                                const actualRow = row0Based + 1;
+                                const rId = blipElem.getAttribute('r:embed') || blipElem.getAttribute('r:link');
+                                const mediaPath = relsMap[rId];
+                                if (mediaPath && mediaFiles[mediaPath]) {
+                                    rowToImageBlobMap[actualRow] = await mediaFiles[mediaPath].async('blob');
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. 排序圖片 media 序列做備用配對
+                const mediaPaths = Object.keys(mediaFiles).sort((a, b) => {
+                    const numA = parseInt(a.replace(/\D/g, ''), 10) || 0;
+                    const numB = parseInt(b.replace(/\D/g, ''), 10) || 0;
+                    return numA - numB;
+                });
+
+                for (let i = 0; i < studentMetaList.length; i++) {
+                    const meta = studentMetaList[i];
+                    let imgBlob = rowToImageBlobMap[meta.rowIdx];
+
+                    // 備用匹配：按自然順序
+                    if (!imgBlob && mediaPaths[i]) {
+                        imgBlob = await mediaFiles[mediaPaths[i]].async('blob');
+                    }
+
+                    if (imgBlob) {
+                        const base64 = await blobToBase64(imgBlob);
+                        parsedExtractedStudents.push({
+                            name: meta.name,
+                            fileName: `${meta.name}.jpg`,
+                            blob: imgBlob,
+                            base64: base64
+                        });
+                    }
+                }
+
+                document.getElementById('parsedPhotoCount').innerText = parsedExtractedStudents.length;
+                document.getElementById('parsedRosterCount').innerText = parsedRosterRows.length;
+
+                alert(`🎉 成功解析！共讀取 ${parsedRosterRows.length} 位學生名冊與 ${parsedExtractedStudents.length} 張學生照片。\n請點擊「一鍵寫入試算表並上傳照片」同步至雲端。`);
+
+            } catch (err) {
+                console.error("Excel 解析錯誤:", err);
+                alert("Excel 解析失敗：" + err.message + "\n請確認上傳的是正確的 .xlsx 檔案。");
+            }
+        }
+
+        // 打包下載相片 ZIP
+        async function downloadParsedZip() {
+            if (parsedExtractedStudents.length === 0) {
+                alert("目前沒有可下載的學生照片！");
+                return;
+            }
+            const zip = new JSZip();
+            parsedExtractedStudents.forEach(st => {
+                zip.file(st.fileName, st.blob);
+            });
+            const content = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(content);
+            a.download = `學生照片全體_${parsedExtractedStudents.length}張.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // 一鍵寫入雲端試算表 (A2:E) 並上傳學生照片至 Drive
+        async function uploadExcelDataToCloud() {
+            if (parsedRosterRows.length === 0 && parsedExtractedStudents.length === 0) {
+                alert("請先上傳並解析 Excel 檔案！");
+                return;
+            }
+
+            saveConfig();
+            const sheetId = document.getElementById('cfgSheetId').value.trim();
+            const photoFolderId = document.getElementById('cfgPhotoFolderId').value.trim();
+
+            const cloudUploadBtn = document.getElementById('cloudUploadBtn');
+            const statusBox = document.getElementById('uploadStatusBox');
+            const statusText = document.getElementById('uploadStatusText');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressText = document.getElementById('uploadProgressText');
+
+            cloudUploadBtn.disabled = true;
+            statusBox.classList.remove('hidden');
+            statusText.innerText = "⏳ 正在傳輸名冊 (A2:E) 與照片至 Google 雲端...";
+            progressBar.style.width = '30%';
+            progressText.innerText = '30%';
+
+            try {
+                const payload = {
+                    spreadsheetId: sheetId,
+                    photoFolderId: photoFolderId,
+                    roster: parsedRosterRows,
+                    files: parsedExtractedStudents.map(st => ({
+                        name: st.fileName,
+                        base64: st.base64
+                    }))
+                };
+
+                progressBar.style.width = '65%';
+                progressText.innerText = '65%';
+
+                const response = await fetch(DEFAULT_GAS_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    progressBar.style.width = '100%';
+                    progressText.innerText = '100%';
+                    statusText.innerText = `🎉 成功！名冊已寫入試算表 (${result.rosterCount} 筆)，照片已上傳 (${result.photoCount} 張)！`;
+
+                    alert(`🎉 雲端同步完成！\n已成功將 ${result.rosterCount} 筆學生名冊寫入試算表 A2:E，並上傳 ${result.photoCount} 張學生相片至雲端資料夾！`);
+
+                    // 自動觸發重新抓取最新資料
+                    fetchCloudData();
+                } else {
+                    throw new Error(result.message || "上傳失敗");
+                }
+            } catch (err) {
+                console.error("雲端上傳失敗:", err);
+                statusText.innerText = "❌ 雲端同步失敗：" + err.message;
+                alert("雲端同步失敗：" + err.message + "\n請確認試算表與照片資料夾是否已設為「知道連結的使用者皆可檢視」！");
+            } finally {
+                cloudUploadBtn.disabled = false;
+            }
+        }
+
+        // ================= 在學證明書資料抓取與渲染 =================
+        function loadSampleData() {
+            studentList = [
+                {
+                    selected: true,
+                    name: "王小明",
+                    idCard: "V123456789",
+                    birthday: "2013-07-08",
+                    grade: "六年一班",
+                    seatNo: "01",
+                    photo: ""
+                }
+            ];
+            renderStudentTable();
+            renderCertificates();
+        }
+
+        async function fetchCloudData() {
+            saveConfig();
+
+            const gasUrl = DEFAULT_GAS_URL;
+            const sheetId = document.getElementById('cfgSheetId').value.trim();
+            const photoFolderId = document.getElementById('cfgPhotoFolderId').value.trim();
+            const sealFolderId = document.getElementById('cfgSealFolderId').value.trim();
+
+            const statusEl = document.getElementById('syncStatus');
+            const syncBtn = document.getElementById('syncBtn');
+            const syncDetail = document.getElementById('syncDetail');
+            
+            statusEl.innerText = "⏳ 正在自雲端載入資料...";
+            statusEl.className = "bg-yellow-100 text-yellow-700 font-semibold px-2 py-0.5 rounded border border-yellow-300";
+            syncBtn.disabled = true;
+            syncBtn.classList.add('opacity-50');
+
+            try {
+                const url = new URL(gasUrl);
+                if (sheetId) url.searchParams.append('spreadsheetId', sheetId);
+                if (photoFolderId) url.searchParams.append('photoFolderId', photoFolderId);
+                if (sealFolderId) url.searchParams.append('sealFolderId', sealFolderId);
+
+                const response = await fetch(url.toString());
+                if (!response.ok) throw new Error("GAS 伺服器回應錯誤 (" + response.status + ")");
+                
+                const res = await response.json();
+                if (res.status === 'success') {
+                    if (res.officialSeal) officialSealData = res.officialSeal;
+                    if (res.principalSeal) principalSealData = res.principalSeal;
+
+                    if (res.students && res.students.length > 0) {
+                        studentList = res.students;
+                    }
+
+                    statusEl.innerText = `🟢 同步完成 (${new Date().toLocaleTimeString()})`;
+                    statusEl.className = "bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded border border-emerald-300";
+                    syncDetail.innerText = `成功載入 ${studentList.length} 位學生資料與印章圖檔`;
+                    
+                    renderStudentTable();
+                    renderCertificates();
+                } else {
+                    throw new Error(res.message || "發生未知錯誤");
+                }
+            } catch (err) {
+                console.error("GAS 同步失敗:", err);
+                statusEl.innerText = "⚠️ 雲端讀取失敗";
+                statusEl.className = "bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded border border-red-300";
+                syncDetail.innerText = err.message;
+            } finally {
+                syncBtn.disabled = false;
+                syncBtn.classList.remove('opacity-50');
+            }
+        }
+
+        function formatGrade(str) {
+            if (!str) return "六年級";
+            if (str.includes("一年") || str.startsWith("1")) return "一年級";
+            if (str.includes("二年") || str.startsWith("2")) return "二年級";
+            if (str.includes("三年") || str.startsWith("3")) return "三年級";
+            if (str.includes("四年") || str.startsWith("4")) return "四年級";
+            if (str.includes("五年") || str.startsWith("5")) return "五年級";
+            if (str.includes("六年") || str.startsWith("6")) return "六年級";
+            return str;
+        }
+
+        function toMinguoDate(dateStr) {
+            if (!dateStr) return "中華民國 年 月 日";
+            const clean = dateStr.replace(/\//g, '-');
+            const parts = clean.split('-');
+            if (parts.length < 3) return dateStr;
+            const rocYear = parseInt(parts[0], 10) - 1911;
+            const month = String(parts[1]).padStart(2, '0');
+            const day = String(parts[2]).padStart(2, '0');
+            return `中華民國${rocYear}年${month}月${day}日`;
+        }
+
+        function getIssueDateMinguoSpaced() {
+            const val = document.getElementById('issueDateInput').value;
+            if (!val) return "中 華 民 國 1 1 3 年 1 0 月 2 4 日";
+            const parts = val.split('-');
+            const rocYear = String(parseInt(parts[0], 10) - 1911).split('').join(' ');
+            const month = String(parts[1]).padStart(2, '0').split('').join(' ');
+            const day = String(parts[2]).padStart(2, '0').split('').join(' ');
+            return `中 華 民 國  ${rocYear}  年  ${month}  月  ${day}  日`;
+        }
+
+        function handleLocalPhotoUpload(e) {
+            const files = e.target.files;
+            if (!files.length) return;
+
+            let count = 0;
+            Array.from(files).forEach(file => {
+                const name = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const b64 = event.target.result;
+                    studentList.forEach(st => {
+                        if (st.name === name) {
+                            st.photo = b64;
+                        }
+                    });
+                    count++;
+                    if (count === files.length) {
+                        renderStudentTable();
+                        renderCertificates();
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function renderStudentTable() {
+            const tbody = document.getElementById('studentTableBody');
+            tbody.innerHTML = '';
+            document.getElementById('studentCount').innerText = studentList.length;
+
+            studentList.forEach((st, idx) => {
+                const tr = document.createElement('tr');
+                const hasPhoto = !!st.photo;
+                tr.innerHTML = `
+                    <td class="p-2 text-center"><input type="checkbox" ${st.selected ? 'checked' : ''} onchange="studentList[${idx}].selected = this.checked; renderCertificates();"></td>
+                    <td class="p-2 font-bold">${st.name}</td>
+                    <td class="p-2 font-mono">${st.idCard}</td>
+                    <td class="p-2 font-mono">${st.birthday}</td>
+                    <td class="p-2">${formatGrade(st.grade)}</td>
+                    <td class="p-2">${st.seatNo}</td>
+                    <td class="p-2">
+                        <span class="inline-block px-1.5 py-0.5 rounded text-[10px] ${hasPhoto ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}">
+                            ${hasPhoto ? '照片就緒' : '無照片'}
+                        </span>
+                    </td>
+                    <td class="p-2 text-center">
+                        <button onclick="studentList.splice(${idx}, 1); renderStudentTable(); renderCertificates();" class="text-red-500 hover:underline text-xs">刪除</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function toggleSelectAll(master) {
+            studentList.forEach(st => st.selected = master.checked);
+            renderStudentTable();
+            renderCertificates();
+        }
+
+        function generateDocNo(index) {
+            const prefix = document.getElementById('docPrefix').value;
+            const startNum = document.getElementById('docStartNum').value.trim();
+            
+            if (startNum.includes('-')) {
+                const parts = startNum.split('-');
+                const base = parts[0];
+                const sub = parseInt(parts[1], 10) || 1;
+                return `${prefix}${base}-${sub + index}號`;
+            } else {
+                const num = parseInt(startNum, 10) || 1;
+                return `${prefix}${num + index}號`;
+            }
+        }
+
+        function renderCertificates() {
+            const container = document.getElementById('pagesOutput');
+            container.innerHTML = '';
+
+            const selectedStudents = studentList.filter(s => s.selected);
+            if (selectedStudents.length === 0) {
+                container.innerHTML = '<div class="text-white text-center py-20 text-base">請勾選欲列印的學生資料。</div>';
+                return;
+            }
+
+            const schoolTitle = document.getElementById('schoolName').value.trim() || DEFAULT_SCHOOL_NAME;
+            const termText = document.getElementById('termInput').value;
+            const dateSpaced = getIssueDateMinguoSpaced();
+
+            const offW = document.getElementById('sealOffW').value;
+            const offX = document.getElementById('sealOffX').value;
+            const offY = document.getElementById('sealOffY').value;
+
+            const prinW = document.getElementById('sealPrinW').value;
+            const prinX = document.getElementById('sealPrinX').value;
+            const prinY = document.getElementById('sealPrinY').value;
+
+            for (let i = 0; i < selectedStudents.length; i += 2) {
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'a4-page';
+
+                const pair = [selectedStudents[i], selectedStudents[i + 1]];
+
+                pair.forEach((st, pairIdx) => {
+                    if (!st) {
+                        const emptyCard = document.createElement('div');
+                        emptyCard.className = 'cert-card opacity-0';
+                        pageDiv.appendChild(emptyCard);
+                        return;
+                    }
+
+                    const docNo = generateDocNo(i + pairIdx);
+                    const bdayMinguo = toMinguoDate(st.birthday);
+                    const gradeName = formatGrade(st.grade);
+
+                    const card = document.createElement('div');
+                    card.className = 'cert-card font-kai';
+
+                    card.innerHTML = `
+                        <!-- 圖層 1 & 2：印章層 (背景) -->
+                        <div class="seals-overlay">
+                            ${officialSealData ? `<img src="${officialSealData}" class="seal-official-img" style="width: ${offW}mm; left: ${offX}%; top: ${offY}%;" alt="官防">` : ''}
+                            ${principalSealData ? `<img src="${principalSealData}" class="seal-principal-img" style="width: ${prinW}mm; left: ${prinX}%; top: ${prinY}%;" alt="校長簽名">` : ''}
+                        </div>
+
+                        <!-- 圖層 3：文字與相片 -->
+                        <div class="layer-text text-center pt-2">
+                            <h1 class="text-[26px] font-bold tracking-[3px] text-black">${schoolTitle}</h1>
+                        </div>
+
+                        <div class="layer-text text-right text-[15px] tracking-wide text-black pr-1 font-medium">
+                            ${docNo}
+                        </div>
+
+                        <div class="layer-text flex items-start gap-6 px-3 my-auto">
+                            <div class="w-[30mm] h-[40mm] border border-gray-400 bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                                ${st.photo ? 
+                                    `<img src="${st.photo}" class="w-full h-full object-cover" alt="${st.name}">` : 
+                                    `<span class="text-gray-400 text-xs">${st.name}</span>`
+                                }
+                            </div>
+
+                            <div class="text-[17.5px] leading-[2.2] tracking-wide text-black text-justify flex-1 pt-1">
+                                查學生 <span class="text-[19px] font-bold px-1">${st.name}</span>(${st.idCard}) ， ${bdayMinguo}生， 現在本校${gradeName} ${termText}就讀屬實，特發給在學證明書以資證明。
+                            </div>
+                        </div>
+
+                        <div class="layer-text text-[17.5px] font-bold pl-16 mb-4">
+                            此證
+                        </div>
+
+                        <div class="layer-text text-center text-[17px] text-black font-semibold tracking-wider pb-1">
+                            ${dateSpaced}
+                        </div>
+                    `;
+
+                    pageDiv.appendChild(card);
+                });
+
+                container.appendChild(pageDiv);
+            }
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        ['schoolName', 'docPrefix', 'docStartNum', 'termInput', 'issueDateInput'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                saveConfig();
+                renderCertificates();
+            });
+        });
+    </script>
+</body>
+</html>
