@@ -140,11 +140,11 @@
     <!-- 後台設定與匯入區塊 -->
     <div class="no-print max-w-7xl mx-auto p-4 space-y-4">
         
-        <!-- 外接專案來源設定 (已移除 GAS 網址輸入框，維持 3 欄排版) -->
+        <!-- 外接專案 ID 設定面板 (僅顯示 3 個欄位) -->
         <div class="bg-slate-800 text-white rounded-xl p-4 shadow-md">
             <div class="flex justify-between items-center mb-3">
                 <h2 class="font-bold text-sm text-slate-200 flex items-center gap-2">
-                    🌐 外接專案來源設定 (支援直接貼上完整網址或 ID，設定會自動儲存)
+                    🌐 外接專案來源設定 (支援貼上完整網址或 ID，設定會自動記憶)
                 </h2>
                 <span class="text-[11px] text-amber-300">⚠️ 跨帳號檔案請確保已開啟「知道連結的使用者皆可檢視」</span>
             </div>
@@ -303,10 +303,10 @@
     </div>
 
     <script>
-        // 固定後端 GAS 部署網址
-        const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbwN_QFktKLlqseSi30sXcNwikBy-0IlLrx6tq9Dw5T0gnxc1xvaCqjAjX4rl9StQ5q9qA/exec';
-
-        // 預設 ID 設定
+        // 固定的 GAS 部署網址 (前端不顯示，後端直接呼叫此網址)
+        const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwN_QFktKLlqseSi30sXcNwikBy-0IlLrx6tq9Dw5T0gnxc1xvaCqjAjX4rl9StQ5q9qA/exec';
+        
+        // 預設 ID
         const DEFAULT_SHEET_ID = '12ac9AzjCBFU730acEInsBJhPLw8sk0tmYge2QOnpDyw';
         const DEFAULT_PHOTO_FOLDER = '1AlwaUa9NHPqU4Lw7ysKAHTlU26VIN7pd';
         const DEFAULT_SEAL_FOLDER = '1YtQhIjcf6_FzDYjO5wvG6o0POGisKvvt';
@@ -316,12 +316,12 @@
         let studentList = [];
 
         window.addEventListener('DOMContentLoaded', () => {
-            // 讀取 localStorage 記憶（若無則套用預設）
+            // 讀取 localStorage 記憶
             document.getElementById('cfgSheetId').value = localStorage.getItem('cfgSheetId') || DEFAULT_SHEET_ID;
             document.getElementById('cfgPhotoFolderId').value = localStorage.getItem('cfgPhotoFolderId') || DEFAULT_PHOTO_FOLDER;
             document.getElementById('cfgSealFolderId').value = localStorage.getItem('cfgSealFolderId') || DEFAULT_SEAL_FOLDER;
 
-            // 預設發證日期為今日
+            // 預設發證日期
             const today = new Date();
             const yyyy = today.getFullYear();
             const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -339,7 +339,7 @@
             localStorage.setItem('cfgSealFolderId', document.getElementById('cfgSealFolderId').value.trim());
         }
 
-        // 預設範例
+        // 預設王小明範例
         function loadSampleData() {
             studentList = [
                 {
@@ -360,6 +360,7 @@
         async function fetchCloudData() {
             saveConfig();
 
+            const gasUrl = DEFAULT_GAS_URL;
             const sheetId = document.getElementById('cfgSheetId').value.trim();
             const photoFolderId = document.getElementById('cfgPhotoFolderId').value.trim();
             const sealFolderId = document.getElementById('cfgSealFolderId').value.trim();
@@ -374,7 +375,8 @@
             syncBtn.classList.add('opacity-50');
 
             try {
-                const url = new URL(GAS_API_URL);
+                // 組合 Query 參數
+                const url = new URL(gasUrl);
                 if (sheetId) url.searchParams.append('spreadsheetId', sheetId);
                 if (photoFolderId) url.searchParams.append('photoFolderId', photoFolderId);
                 if (sealFolderId) url.searchParams.append('sealFolderId', sealFolderId);
